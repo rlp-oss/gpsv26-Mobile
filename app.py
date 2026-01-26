@@ -3,21 +3,23 @@ warnings.filterwarnings("ignore")
 
 import streamlit as st
 import google.generativeai as genai
+from google.api_core import exceptions
 import io
+import time
 
-# --- 1. SETUP & BRANDING ---
+# --- 1. CONFIGURATION ---
 st.set_page_config(page_title="Rhythm Logic GPS", page_icon="🧭", layout="centered")
 
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: white; }
-    /* Gold Buttons */
     .stButton button { width: 100%; border-radius: 12px; font-weight: bold; background-color: #d4af37; color: black; border: none; padding: 15px 0px; }
     .stButton button:hover { background-color: #f4cf57; color: black; }
-    /* Headers */
     h1, h2 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
     .step-text { text-align: center; font-size: 18px; margin-bottom: 20px; color: #ccc; }
     .stDeployButton {display:none;}
+    /* Highlight the Strategy Section */
+    .strategy-box { border: 1px solid #d4af37; padding: 10px; border-radius: 10px; margin-top: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -40,119 +42,108 @@ if not api_key:
     api_key = st.text_input("Enter Gemini API Key:", type="password")
     if not api_key: st.stop()
 
-# --- 4. THE PROMPT ENGINE (RE-ENGINEERED) ---
+# --- 4. THE ANTI-CRASH ENGINE ---
+
+def retry_generation(model, contents):
+    """
+    Tries to generate content. If we hit a Rate Limit (ResourceExhausted),
+    it waits 4 seconds and tries again.
+    """
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(contents)
+            return response.text
+        except exceptions.ResourceExhausted:
+            time.sleep(4) # Wait for the quota to reset
+            continue
+        except Exception as e:
+            return f"Error: {e}"
+    return "⚠️ High Traffic: Google is busy. Please wait a minute and try again."
+
 def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
     
-    # ---------------------------------------------------------
-    # HERE IS THE FIX: WE FORCE A SPECIFIC OUTPUT STRUCTURE
-    # ---------------------------------------------------------
+    # THE MANDATORY STRATEGY INSTRUCTION
+    strategy_mandate = """
+    CRITICAL OUTPUT RULE:
+    You must END your response with a section called "🔮 RHYTHM LOGIC STRATEGY".
+    In this section, you must ask the user 3 specific, strategic questions about what to do next.
     
-    base_instruction = f"""
-    You are Rhythm Logic, an expert creative consultant.
-    The user is working on a: {mode}.
+    Examples of questions you should ask:
+    - "Do you want to expand this into a full verse?"
+    - "Should we change the tone to be more aggressive?"
+    - "Do you need help rhyming the next line?"
     
-    IMPORTANT: You have TWO jobs.
-    1. Transcribe/Process the user's audio.
-    2. Generate a STRATEGY SECTION to help them move forward.
-    
-    NEVER return just the transcription. ALWAYS return the strategy.
+    NEVER output just the text. ALWAYS output the text + the questions.
     """
 
-    if style == "✨ Spark Me (Inspiration)":
-        prompt = f"""
-        {base_instruction}
-        
-        TASK:
-        1. Listen to the user's audio idea.
-        2. Transcribe it clearly at the top.
-        3. Create 3 DISTINCT CREATIVE PATHS they could take with this idea.
-        4. Ask 3 "Probing Questions" to help them unlock the next step.
-        
-        OUTPUT FORMAT:
-        **Audio Transcript:**
-        (The text)
-        
-        **⚡ Rhythm Logic Sparks:**
-        1. (Idea A)
-        2. (Idea B)
-        3. (Idea C)
-        
-        **❓ Strategic Questions:**
-        1. (Question)
-        2. (Question)
-        3. (Question)
-        """
-    
-    elif style == "🤝 Co-Pilot (Teamwork)":
-        prompt = f"""
-        {base_instruction}
-        
-        TASK:
-        1. Listen to the audio.
-        2. Write a POLISHED DRAFT based on the audio (expand it into professional prose/lyrics).
-        3. Ask the user what they want to do next.
-        
-        OUTPUT FORMAT:
-        **Draft Version 1.0:**
-        (The polished content)
-        
-        **🚀 Next Steps:**
-        (Ask the user: Do they want to expand? Change tone? Add a section?)
-        """
-        
-    elif style == "🎓 Solo (Advice Only)":
-        prompt = f"""
-        {base_instruction}
-        
-        TASK:
-        1. Transcribe the audio EXACTLY as performed. Do not change a word.
-        2. Provide a "Coach's Critique".
-        
-        OUTPUT FORMAT:
-        **Transcript:**
-        (Verbatim text)
-        
-        **🧐 Coach's Notes:**
-        * Strengths: ...
-        * Weaknesses: ...
-        * Recommended Fix: ...
-        """
-    
-    # If refining existing text
+    # 1. HANDLING UPDATES
     if current_draft:
         prompt = f"""
-        UPDATE this draft based on the audio instructions. 
-        AFTER updating, ask 2 questions about what to do next.
+        You are an expert Editor.
+        1. UPDATE the draft below based on the user's audio instructions.
+        2. Keep the goal of writing a {mode} in mind.
         
-        OLD DRAFT: {current_draft}
+        CURRENT DRAFT:
+        {current_draft}
+        
+        {strategy_mandate}
         """
+        content_payload = [prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
+    
+    # 2. HANDLING NEW CREATION
+    else:
+        if style == "✨ Spark Me (Inspiration)":
+            prompt = f"""
+            You are a Creative Muse. The user has an idea for a {mode}.
+            1. Transcribe the idea.
+            2. Propose 3 distinct directions they could take.
+            {strategy_mandate}
+            """
+        
+        elif style == "🤝 Co-Pilot (Teamwork)":
+            prompt = f"""
+            You are a Ghostwriter. We are writing a {mode}.
+            1. Transcribe the audio.
+            2. Write a polished Draft Version 1.0 based on it.
+            {strategy_mandate}
+            """
+            
+        elif style == "🎓 Solo (Advice Only)":
+            prompt = f"""
+            You are a Coach. The user is practicing a {mode}.
+            1. Transcribe exactly what they performed.
+            2. Give a critique (Strengths/Weaknesses).
+            {strategy_mandate}
+            """
+        content_payload = [prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
 
-    try:
-        response = model.generate_content([prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}])
-        return response.text
-    except Exception as e:
-        return f"Error: {e}"
+    # USE THE RETRY FUNCTION
+    return retry_generation(model, content_payload)
 
 def text_chat(text_input, current_draft, key):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
+    
     prompt = f"""
     Update the draft below based on this request: "{text_input}"
     
-    After updating, add a "❓ Next Question" section to keep the momentum going.
+    CRITICAL: After updating the text, add a "🔮 RHYTHM LOGIC STRATEGY" section with 3 questions on what to do next.
     
     DRAFT:
     {current_draft}
     """
-    return model.generate_content(prompt).text
+    
+    # USE THE RETRY FUNCTION
+    return retry_generation(model, prompt)
 
 # --- 5. THE APP FLOW ---
 
 st.title("RHYTHM LOGIC GPS")
 
-# SIDEBAR
+# SIDEBAR RESET
 with st.sidebar:
     st.write(f"**Project:** {st.session_state.project_type}")
     if st.button("🔄 Start New Project"):
@@ -163,7 +154,7 @@ with st.sidebar:
 # STEP 1: PROJECT TYPE
 if st.session_state.step == 1:
     st.write("")
-    st.markdown("## 1. What are we building?")
+    st.markdown("## 1. What can I help you write today?")
     st.write("")
     
     col1, col2, col3 = st.columns([1,2,1])
@@ -188,9 +179,9 @@ elif st.session_state.step == 2:
         "Workflow:",
         ["✨ Spark Me (Inspiration)", "🤝 Co-Pilot (Teamwork)", "🎓 Solo (Advice Only)"],
         captions=[
-            "I'll analyze your idea and give you 3 creative strategies & questions.",
-            "We write together. You talk, I write the draft.",
-            "I critique your performance without changing your words."
+            "I'll listen to your idea and give you 3 creative paths + strategy questions.",
+            "We write together. You talk, I write the draft + ask what's next.",
+            "I critique your performance without changing your words + ask guidance questions."
         ]
     )
     
@@ -238,10 +229,13 @@ elif st.session_state.step == 3:
         # CHAT
         st.divider()
         st.markdown("#### 🎬 Director's Chair")
-        user_instruct = st.text_input("Reply to the AI's questions or give new orders:", placeholder="Ex: Option 2 looks good. Let's write the first verse based on that.")
-        if st.button("Update"):
+        st.caption("Tell the AI what to do next (e.g., 'Answer Question 1' or 'Make it funnier')")
+        
+        user_instruct = st.text_input("Instruction:", label_visibility="collapsed", placeholder="Type your next instruction here...")
+        
+        if st.button("Update Draft"):
             if user_instruct:
-                with st.spinner("Updating..."):
+                with st.spinner("Updating... (If this takes a moment, we are bypassing traffic)"):
                     updated = text_chat(user_instruct, st.session_state.last_draft, api_key)
                     st.session_state.last_draft = updated
                     st.rerun()
