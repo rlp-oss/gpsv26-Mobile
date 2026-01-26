@@ -1,55 +1,40 @@
 import warnings
-warnings.filterwarnings("ignore") # Silence non-critical warnings
+warnings.filterwarnings("ignore")
 
 import streamlit as st
 import google.generativeai as genai
 import io
 
-# --- 1. SETUP & BRANDING (The Gold Suit) ---
-st.set_page_config(
-    page_title="Rhythm Logic GPS", 
-    page_icon="🎙️", 
-    layout="centered"
-)
+# --- 1. SETUP & BRANDING ---
+st.set_page_config(page_title="Rhythm Logic GPS", page_icon="🧭", layout="centered")
 
-# Custom Gold Branding
 st.markdown("""
 <style>
-    /* Main Background */
     .stApp { background-color: #0e1117; color: white; }
-    
     /* Gold Buttons */
-    .stButton button { 
-        width: 100%; 
-        border-radius: 12px; 
-        font-weight: bold; 
-        background-color: #d4af37; 
-        color: black; 
-        border: none;
-        padding: 15px 0px;
-    }
-    .stButton button:hover {
-        background-color: #f4cf57;
-        color: black;
-    }
-
+    .stButton button { width: 100%; border-radius: 12px; font-weight: bold; background-color: #d4af37; color: black; border: none; padding: 15px 0px; }
+    .stButton button:hover { background-color: #f4cf57; color: black; }
     /* Headers */
-    h1 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
-    h3 { color: white; text-align: center; font-weight: 300; font-size: 18px; }
-    
-    /* Input Fields */
-    .stTextInput input { border-radius: 10px; }
-    .stSelectbox div[data-baseweb="select"] { border-radius: 10px; }
-    .stTextArea textarea { border-radius: 10px; }
+    h1, h2 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
+    .step-text { text-align: center; font-size: 18px; margin-bottom: 20px; color: #ccc; }
+    /* Hide Deploy Button */
+    .stDeployButton {display:none;}
 </style>
 """, unsafe_allow_html=True)
 
-st.title("Rhythm Logic GPS")
-st.markdown("### The Professional's Ghostwriter")
+# --- 2. SESSION STATE MANAGEMENT (The "Brain") ---
+# We use this to remember where the user is in the onboarding process
+if "step" not in st.session_state:
+    st.session_state.step = 1
+if "project_type" not in st.session_state:
+    st.session_state.project_type = "Book Chapter"
+if "work_style" not in st.session_state:
+    st.session_state.work_style = "Teamwork"
+if "last_draft" not in st.session_state:
+    st.session_state.last_draft = ""
 
-# --- 2. SECURITY CHECK ---
+# --- 3. SECURITY CHECK ---
 api_key = None
-
 try:
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
@@ -58,163 +43,170 @@ except:
 
 if not api_key:
     st.warning("🔒 Security Check")
-    api_key = st.text_input("Enter Gemini API Key:", type="password", placeholder="Paste key here...")
-    
+    api_key = st.text_input("Enter Gemini API Key:", type="password")
     if not api_key:
-        st.info("Need a key? Get it free: https://aistudio.google.com/app/apikey")
         st.stop()
 
-# --- 3. SESSION STATE (The Memory) ---
-# This keeps your work safe so you can "chat" with the AI without losing the lyrics.
-if "history" not in st.session_state:
-    st.session_state["history"] = ""
-if "last_draft" not in st.session_state:
-    st.session_state["last_draft"] = ""
-
-# --- 4. THE AI ENGINE ---
-def engineer_content(audio_file, mode, key, current_draft=""):
-    """Sends audio to Gemini and returns professional text + Questions."""
+# --- 4. AI ENGINES (Customized by Mode) ---
+def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
-
-    # If this is a refinement (we already have text), we change the prompt
+    
+    # LOGIC BRANCHING BASED ON USER CHOICE
+    if style == "✨ Spark Me (Inspiration)":
+        prompt = f"""
+        You are a Creative Muse for Rhythm Logic.
+        The user wants to write a {mode} but needs inspiration.
+        1. Listen to their audio notes (ideas, fragments, vibes).
+        2. Transcribe them.
+        3. Generate 3 DISTINCT CREATIVE DIRECTIONS or OUTLINES they could take.
+        4. Do not write the full piece yet; just pitch the concepts to get them excited.
+        """
+    
+    elif style == "🤝 Co-Pilot (Teamwork)":
+        prompt = f"""
+        You are an expert Ghostwriter. We are writing a {mode} together.
+        1. Listen to the audio.
+        2. Transcribe it.
+        3. WRITE A FULL DRAFT based on the audio, polishing the prose/lyrics to a professional standard.
+        4. At the end, add a "RHYTHM LOGIC STRATEGY" section asking 3 specific questions to help refine the draft.
+        """
+        
+    elif style == "🎓 Solo (Advice Only)":
+        prompt = f"""
+        You are a tough Editor/Critic. The user is writing a {mode}.
+        1. Listen to the audio (which is their draft).
+        2. Transcribe it exactly as is.
+        3. DO NOT REWRITE IT.
+        4. Instead, provide a "CRITICAL ANALYSIS":
+           - Strengths
+           - Weaknesses
+           - 3 Specific Action Steps to improve it.
+        """
+    
+    # If refining existing text
     if current_draft:
-        prompt = f"""
-        You are an expert Ghostwriter for Rhythm Logic.
-        The user wants to refine their current draft based on new instructions.
-        
-        CURRENT DRAFT:
-        {current_draft}
-        
-        USER INSTRUCTION (Audio):
-        Listen to the audio instructions and update the draft accordingly.
-        
-        OUTPUT FORMAT:
-        1. The Updated Draft.
-        2. "Rhythm Logic Strategy": Ask 3 short, punchy questions about what the user wants to do next (e.g., "Add a bridge?", "Change the tone?", "Expand the second verse?").
-        """
-    else:
-        # First time generation
-        prompt = f"""
-        You are an expert Ghostwriter for Rhythm Logic.
-        1. Listen to the user's audio.
-        2. Transcribe it perfectly.
-        3. REWRITE it into this professional format: {mode}.
-        
-        CRITICAL STEP:
-        At the bottom of your response, create a section called "🔮 RHYTHM LOGIC STRATEGY".
-        In this section, ask the user 3 strategic questions to help them expand the piece.
-        Example: "Do you want me to write a Bridge for this?", "Should we make the second verse darker?", "Do you want a counter-melody?"
-        """
+        prompt = f"UPDATE the following draft based on the user's audio instructions. Keep the goal of {mode} in mind.\n\nDRAFT:\n{current_draft}"
 
     try:
-        response = model.generate_content([
-            prompt,
-            {"mime_type": "audio/mp3", "data": audio_file.read()}
-        ])
+        response = model.generate_content([prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}])
         return response.text
     except Exception as e:
         return f"Error: {e}"
 
-def text_refinement(instruction_text, current_draft, key):
-    """Allows text-based chatting to update the draft."""
+def text_chat(text_input, current_draft, key):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
+    prompt = f"Update this draft based on the request: {text_input}\n\nDRAFT:\n{current_draft}"
+    return model.generate_content(prompt).text
+
+# --- 5. THE ONBOARDING FLOW ---
+
+# HEADER
+st.title("RHYTHM LOGIC GPS")
+
+# RESET BUTTON (In Sidebar)
+with st.sidebar:
+    st.write(f"**Current Mode:** {st.session_state.project_type}")
+    if st.button("🔄 Start Over"):
+        st.session_state.step = 1
+        st.session_state.last_draft = ""
+        st.rerun()
+
+# --- STEP 1: THE GOAL ---
+if st.session_state.step == 1:
+    st.write("")
+    st.markdown("## 1. What can I help you write today?")
+    st.write("")
     
-    prompt = f"""
-    You are an expert Ghostwriter. Update the draft based on the user's text request.
-    
-    CURRENT DRAFT:
-    {current_draft}
-    
-    USER REQUEST:
-    {instruction_text}
-    
-    OUTPUT FORMAT:
-    1. The Updated Draft.
-    2. "🔮 RHYTHM LOGIC STRATEGY": 3 new questions for the next step.
-    """
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error: {e}"
-
-# --- 5. THE INTERFACE ---
-st.divider()
-
-# Mode Selection
-mode = st.selectbox(
-    "📝 Select Blueprint",
-    [
-        "Song Lyrics (Verse/Chorus)", 
-        "Sci-Fi Story Scene", 
-        "Business Email", 
-        "Medical Note (SOAP)",
-        "Legal Brief",
-        "Blog Post"
-    ]
-)
-
-# Audio Inputs
-st.write("") 
-tab1, tab2 = st.tabs(["🎙️ RECORD", "📂 UPLOAD"])
-
-audio_data = None
-
-with tab1:
-    audio_data_recorded = st.audio_input("Tap to Record")
-    if audio_data_recorded:
-        audio_data = audio_data_recorded
-
-with tab2:
-    uploaded_file = st.file_uploader("Upload Audio File", type=["wav", "mp3", "m4a", "webm"])
-    if uploaded_file:
-        audio_data = uploaded_file
-
-# --- 6. ACTION & DISPLAY ---
-
-if audio_data:
-    st.divider()
-    if st.button("⚡ ENGAGE RHYTHM LOGIC"):
-        with st.spinner("🎧 Listening & Strategizing..."):
-            # We pass the existing draft if we have one, to allow audio refinements
-            result = engineer_content(audio_data, mode, api_key, st.session_state["last_draft"])
-        
-        if "Error" in result:
-            st.error(result)
-        else:
-            st.session_state["last_draft"] = result # Save to memory
-            st.rerun() # Refresh to show the result in the editor below
-
-# DISPLAY RESULTS (If they exist in memory)
-if st.session_state["last_draft"]:
-    st.success("Draft & Strategy Generated")
-    
-    # 1. The Output Box (Editable)
-    edited_text = st.text_area("Live Editor", st.session_state["last_draft"], height=400)
-    st.session_state["last_draft"] = edited_text # Allow manual edits to stick
-
-    st.download_button(
-        label="💾 Download Draft",
-        data=st.session_state["last_draft"],
-        file_name="Rhythm_Logic_Draft.txt",
-        mime="text/plain"
-    )
-
-    st.divider()
-    
-    # 2. The Director's Chair (Refinement)
-    st.markdown("### 🎬 Director's Chair")
-    st.caption("Answer the AI's questions above, or give new instructions (e.g., 'Write a bridge based on Question 1')")
-    
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        refinement_instruction = st.text_input("Tell Rhythm Logic what to do next...", label_visibility="collapsed", placeholder="Ex: Add a chorus about heartbreak...")
+    col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        if st.button("🔄 Update"):
-            if refinement_instruction:
-                with st.spinner("Rewriting..."):
-                    new_version = text_refinement(refinement_instruction, st.session_state["last_draft"], api_key)
-                    st.session_state["last_draft"] = new_version
+        project = st.selectbox(
+            "Select Project Type",
+            [
+                "Book Chapter",
+                "Song Lyrics",
+                "Sci-Fi Scene",
+                "Blog Post",
+                "Business Proposal",
+                "Speech / Talk",
+                "Personal Journal"
+            ],
+            label_visibility="collapsed"
+        )
+        st.write("")
+        if st.button("Next ➡"):
+            st.session_state.project_type = project
+            st.session_state.step = 2
+            st.rerun()
+
+# --- STEP 2: THE VIBE ---
+elif st.session_state.step == 2:
+    st.markdown(f"## 2. We are writing a **{st.session_state.project_type}**.")
+    st.markdown("<p class='step-text'>How would you like to work?</p>", unsafe_allow_html=True)
+    
+    style = st.radio(
+        "Choose your workflow:",
+        [
+            "✨ Spark Me (Inspiration)", 
+            "🤝 Co-Pilot (Teamwork)", 
+            "🎓 Solo (Advice Only)"
+        ],
+        captions=[
+            "I'll listen to your messy ideas and give you 3 solid outlines/concepts.",
+            "We write together. You talk, I draft the text and polish it.",
+            "You write/perform. I listen and critique you like a coach. I won't change your words."
+        ]
+    )
+    
+    st.write("")
+    if st.button("Enter Studio 🚀"):
+        st.session_state.work_style = style
+        st.session_state.step = 3
+        st.rerun()
+
+# --- STEP 3: THE STUDIO ---
+elif st.session_state.step == 3:
+    st.markdown(f"### 🎙️ {st.session_state.project_type} Studio")
+    st.caption(f"Mode: {st.session_state.work_style}")
+    st.divider()
+
+    # INPUT TABS
+    tab1, tab2 = st.tabs(["🔴 Record", "📂 Upload"])
+    audio_data = None
+    with tab1:
+        audio_rec = st.audio_input("Record Audio")
+        if audio_rec: audio_data = audio_rec
+    with tab2:
+        audio_up = st.file_uploader("Upload File", type=['mp3','wav','m4a'])
+        if audio_up: audio_data = audio_up
+
+    # PROCESS
+    if audio_data:
+        if st.button("⚡ Run Rhythm Logic"):
+            with st.spinner("Processing..."):
+                result = run_rhythm_logic(audio_data, st.session_state.project_type, st.session_state.work_style, api_key, st.session_state.last_draft)
+                st.session_state.last_draft = result
+                st.rerun()
+
+    # OUTPUT & EDIT
+    if st.session_state.last_draft:
+        st.success("Result Generated")
+        
+        # Text Editor
+        new_text = st.text_area("Workspace", st.session_state.last_draft, height=400)
+        st.session_state.last_draft = new_text
+        
+        # Download
+        st.download_button("💾 Save to Device", st.session_state.last_draft, "RL_Draft.txt")
+        
+        # Refinement Chat
+        st.divider()
+        st.markdown("#### 🎬 Director's Chair")
+        user_instruct = st.text_input("Give feedback to refine this draft...", placeholder="Ex: Make the tone darker...")
+        if st.button("Update Draft"):
+            if user_instruct:
+                with st.spinner("Refining..."):
+                    updated = text_chat(user_instruct, st.session_state.last_draft, api_key)
+                    st.session_state.last_draft = updated
                     st.rerun()
