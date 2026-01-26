@@ -11,7 +11,6 @@ st.set_page_config(
     layout="centered"
 )
 
-# Custom Gold Branding
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: white; }
@@ -22,14 +21,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (HARDCODED FOR STABILITY) ---
+# --- 2. AUTHENTICATION (FIXED WITH SLASH) ---
 
-# WE HARDCODE THE WORKING URL HERE TO PREVENT 403 ERRORS
-REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
+# WE ADD THE SLASH HERE TO MATCH YOUR BROWSER
+REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app/"
 
 def authenticate_google():
     """Handles the secure login flow"""
     
+    # We ignore the secrets file URI and force the correct one here
     client_config = {
         "web": {
             "client_id": st.secrets["web"]["client_id"],
@@ -48,9 +48,13 @@ def authenticate_google():
 
     if "code" in st.query_params:
         code = st.query_params["code"]
-        flow.fetch_token(code=code)
-        st.query_params.clear()
-        return flow.credentials
+        try:
+            flow.fetch_token(code=code)
+            st.query_params.clear()
+            return flow.credentials
+        except Exception as e:
+            st.error(f"Login Error: {e}")
+            return None
         
     return None
 
