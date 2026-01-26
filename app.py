@@ -1,116 +1,148 @@
+import warnings
+warnings.filterwarnings("ignore") # Silence non-critical warnings
+
 import streamlit as st
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-from googleapiclient.http import MediaIoBaseUpload
+import google.generativeai as genai
 import io
 
-# --- 1. SETUP ---
-st.set_page_config(page_title="Rhythm Logic GPS", page_icon="📱", layout="centered")
+# --- 1. SETUP & BRANDING (The Gold Suit) ---
+st.set_page_config(
+    page_title="Rhythm Logic GPS", 
+    page_icon="🎙️", 
+    layout="centered"
+)
 
-# --- 2. THE DIAGNOSTIC ENGINE (EXACT COPY - DO NOT TOUCH) ---
-# This is the exact link that worked in the test.
-REAL_REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
-
-def get_auth_flow():
-    client_config = {
-        "web": {
-            "client_id": st.secrets["web"]["client_id"],
-            "client_secret": st.secrets["web"]["client_secret"],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [REAL_REDIRECT_URI],
-        }
-    }
-    return Flow.from_client_config(
-        client_config,
-        scopes=['https://www.googleapis.com/auth/drive.file'],
-        redirect_uri=REAL_REDIRECT_URI
-    )
-
-def authenticate():
-    flow = get_auth_flow()
-    # Only try to trade the code for a token if a code actually exists
-    if "code" in st.query_params:
-        try:
-            code = st.query_params["code"]
-            flow.fetch_token(code=code)
-            st.query_params.clear() # IMMEDIATE CLEAR
-            return flow.credentials
-        except Exception:
-            st.query_params.clear() # IMMEDIATE CLEAR ON FAIL
-            return None
-    return None
-
-# --- 3. UI STYLING ---
+# Custom Gold Branding
 st.markdown("""
 <style>
+    /* Main Background */
     .stApp { background-color: #0e1117; color: white; }
-    .stButton button { width: 100%; border-radius: 20px; font-weight: bold; background-color: #d4af37; color: black; border: none; }
+    
+    /* Gold Buttons */
+    .stButton button { 
+        width: 100%; 
+        border-radius: 12px; 
+        font-weight: bold; 
+        background-color: #d4af37; 
+        color: black; 
+        border: none;
+        padding: 15px 0px;
+    }
+    .stButton button:hover {
+        background-color: #f4cf57;
+        color: black;
+    }
+
+    /* Headers */
     h1 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
-    .caption { text-align: center; color: #888; font-size: 12px; letter-spacing: 1px; }
-    .login-btn { background-color: #d4af37; color: black; padding: 15px 32px; text-align: center; display: block; font-size: 16px; border-radius: 12px; width: 100%; font-weight: bold; margin-top: 20px; text-decoration: none;}
-    a { text-decoration: none; }
+    h3 { color: white; text-align: center; font-weight: 300; font-size: 18px; }
+    
+    /* Input Fields */
+    .stTextInput input { border-radius: 10px; }
+    .stSelectbox div[data-baseweb="select"] { border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 4. EXECUTION LOGIC ---
+st.title("Rhythm Logic GPS")
+st.markdown("### The Professional's Ghostwriter")
 
-st.title("RHYTHM LOGIC GPS")
-st.markdown('<p class="caption">MOBILE PUBLISHER | ENTERPRISE EDITION</p>', unsafe_allow_html=True)
+# --- 2. SECURITY CHECK (Simple & Unbreakable) ---
+api_key = None
+
+# Check Secrets First
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+except:
+    pass
+
+# If no secret, ask manually (Prevents crashing)
+if not api_key:
+    st.warning("🔒 Security Check")
+    api_key = st.text_input("Enter Gemini API Key:", type="password", placeholder="Paste key here...")
+    
+    if not api_key:
+        st.info("Need a key? Get it free: https://aistudio.google.com/app/apikey")
+        st.stop()
+
+# --- 3. THE AI ENGINE ---
+def engineer_content(audio_file, mode, key):
+    """Sends audio to Gemini and returns professional text."""
+    genai.configure(api_key=key)
+    
+    # Using Flash for speed and reliability
+    model = genai.GenerativeModel('gemini-1.5-flash')
+
+    prompt = f"""
+    You are an expert Ghostwriter for Rhythm Logic.
+    1. Listen to the user's audio.
+    2. Transcribe it perfectly.
+    3. REWRITE it into this professional format: {mode}.
+    4. Ensure the tone is polished and ready for publication.
+    """
+
+    try:
+        response = model.generate_content([
+            prompt,
+            {"mime_type": "audio/mp3", "data": audio_file.read()}
+        ])
+        return response.text
+    except Exception as e:
+        return f"Error: {e}"
+
+# --- 4. THE INTERFACE ---
 st.divider()
 
-# SIDEBAR RESET (Your Escape Hatch)
-with st.sidebar:
-    if st.button("🔄 FORCE RESET"):
-        for key in st.session_state.keys():
-            del st.session_state[key]
-        st.query_params.clear()
-        st.rerun()
+# Mode Selection
+mode = st.selectbox(
+    "📝 Select Blueprint",
+    [
+        "Song Lyrics (Verse/Chorus)", 
+        "Sci-Fi Story Scene", 
+        "Business Email", 
+        "Medical Note (SOAP)",
+        "Legal Brief",
+        "Blog Post",
+        "Book Chapter"
+    ]
+)
 
-# AUTH CHECK
-if "creds" not in st.session_state:
-    creds = authenticate()
-    if not creds:
-        # Show Login Screen
-        flow = get_auth_flow()
-        auth_url, _ = flow.authorization_url(prompt='consent')
+# Audio Inputs (Clean Tabs)
+st.write("") # Spacing
+tab1, tab2 = st.tabs(["🎙️ RECORD", "📂 UPLOAD"])
+
+audio_data = None
+
+with tab1:
+    audio_data_recorded = st.audio_input("Tap to Record")
+    if audio_data_recorded:
+        audio_data = audio_data_recorded
+
+with tab2:
+    uploaded_file = st.file_uploader("Upload Audio File", type=["wav", "mp3", "m4a", "webm"])
+    if uploaded_file:
+        audio_data = uploaded_file
+
+# --- 5. ACTION & SAVE ---
+if audio_data:
+    st.divider()
+    if st.button("⚡ ENGAGE RHYTHM LOGIC"):
+        with st.spinner("🎧 Listening & Engineering..."):
+            result = engineer_content(audio_data, mode, api_key)
         
-        st.info("🔒 Secure Cloud Workspace")
-        st.write("Connect to Google Drive to sync your voice notes.")
-        st.markdown(f'<a href="{auth_url}" target="_self"><div class="login-btn">👉 SIGN IN WITH GOOGLE</div></a>', unsafe_allow_html=True)
-    else:
-        st.session_state["creds"] = creds
-        st.rerun()
-
-else:
-    # STUDIO SCREEN (Only shows if logged in)
-    service = build('drive', 'v3', credentials=st.session_state['creds'])
-    
-    # 1. Silent Folder Connect
-    try:
-        query = "name='Rhythm Logic Studio' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, spaces='drive').execute()
-        items = results.get('files', [])
-        if not items:
-            file_metadata = {'name': 'Rhythm Logic Studio', 'mimeType': 'application/vnd.google-apps.folder'}
-            folder = service.files().create(body=file_metadata, fields='id').execute()
-            folder_id = folder.get('id')
+        if "Error" in result:
+            st.error("Connection Error. Please check your API Key.")
+            st.error(result)
         else:
-            folder_id = items[0]['id']
-    except:
-        folder_id = None
-
-    # 2. Recorder
-    st.subheader("🎙️ Dictation Studio")
-    st.success("Ready to record.")
-    
-    audio_value = st.audio_input("Record Chapter")
-    
-    if audio_value:
-        with st.spinner("Syncing to Cloud..."):
-            file_metadata = {'name': 'New_Chapter_Draft.wav'}
-            if folder_id:
-                file_metadata['parents'] = [folder_id]
-            media = MediaIoBaseUpload(io.BytesIO(audio_value.getvalue()), mimetype='audio/wav')
-            service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-            st.toast("Saved to 'Rhythm Logic Studio'! 💾")
+            st.success("Draft Complete")
+            
+            # Display Result
+            st.text_area("Final Output", result, height=350)
+            
+            # DOWNLOAD BUTTON (Safe Alternative to Drive)
+            st.download_button(
+                label="💾 Download Text File",
+                data=result,
+                file_name=f"Rhythm_Logic_{mode.split()[0]}.txt",
+                mime="text/plain"
+            )
