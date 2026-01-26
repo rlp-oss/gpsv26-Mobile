@@ -4,127 +4,80 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
 
-# --- 1. SETUP & BRANDING ---
-st.set_page_config(
-    page_title="Rhythm Logic GPS v26.0", 
-    page_icon="📱", 
-    layout="centered"
-)
+st.set_page_config(page_title="Rhythm Logic Diagnostic", page_icon="🔧")
 
-# Custom Gold Branding
-st.markdown("""
-<style>
-    .stApp { background-color: #0e1117; color: white; }
-    .stButton button { width: 100%; border-radius: 20px; font-weight: bold; background-color: #d4af37; color: black; border: none; }
-    h1 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
-    .caption { text-align: center; color: #888; font-size: 12px; letter-spacing: 1px; }
-    .login-btn { background-color: #d4af37; color: black; padding: 15px 32px; text-align: center; display: block; font-size: 16px; border-radius: 12px; width: 100%; font-weight: bold; margin-top: 20px; text-decoration: none;}
-    a { text-decoration: none; }
-</style>
-""", unsafe_allow_html=True)
+# --- 1. HARDCODED SETTINGS (The Source of Truth) ---
+# This is the link we are forcing the app to use.
+# It has NO SLASH at the end.
+REAL_REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
 
-# --- 2. AUTHENTICATION (Hardcoded for Stability) ---
-# We use the NO-SLASH version as our primary target
-REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
+# --- 2. THE DIAGNOSTIC HEADER ---
+st.title("🔧 Repair Mode")
+st.write("We are going to match these settings 100% with Google.")
 
+st.warning("👇 STEP 1: COPY THIS EXACT LINK:")
+st.code(REAL_REDIRECT_URI, language="text")
+st.write("Go to **Google Cloud Console > Credentials > OAuth Client**.")
+st.write("Paste that link into 'Authorized redirect URIs'. **Delete any others.**")
+
+st.divider()
+
+# --- 3. AUTH LOGIC ---
 def get_auth_flow():
-    """Creates the connection using the verified settings"""
     client_config = {
         "web": {
             "client_id": st.secrets["web"]["client_id"],
             "client_secret": st.secrets["web"]["client_secret"],
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
             "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [REDIRECT_URI],
+            "redirect_uris": [REAL_REDIRECT_URI],
         }
     }
     return Flow.from_client_config(
         client_config,
         scopes=['https://www.googleapis.com/auth/drive.file'],
-        redirect_uri=REDIRECT_URI
+        redirect_uri=REAL_REDIRECT_URI
     )
 
-def authenticate_google():
+def authenticate():
     flow = get_auth_flow()
-    
     if "code" in st.query_params:
-        code = st.query_params["code"]
         try:
+            code = st.query_params["code"]
             flow.fetch_token(code=code)
-            st.query_params.clear()
             return flow.credentials
-        except Exception:
-            st.query_params.clear()
+        except Exception as e:
+            st.error(f"Token Error: {e}")
             return None
     return None
 
-def get_login_url():
-    flow = get_auth_flow()
-    auth_url, _ = flow.authorization_url(prompt='consent')
-    return auth_url
-
-# --- 3. DRIVE LOGIC ---
-def get_rhythm_logic_folder(service):
-    try:
-        query = "name='Rhythm Logic Studio' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, spaces='drive').execute()
-        items = results.get('files', [])
-        
-        if not items:
-            file_metadata = {'name': 'Rhythm Logic Studio', 'mimeType': 'application/vnd.google-apps.folder'}
-            folder = service.files().create(body=file_metadata, fields='id').execute()
-            return folder.get('id')
-        else:
-            return items[0]['id']
-    except:
-        return None
-
-def upload_audio_draft(service, folder_id, audio_bytes):
-    file_metadata = {'name': 'New_Chapter_Draft.wav'}
-    if folder_id:
-        file_metadata['parents'] = [folder_id]
-    media = MediaIoBaseUpload(io.BytesIO(audio_bytes), mimetype='audio/wav')
-    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-    return file.get('id')
-
-# --- 4. THE INTERFACE ---
-st.title("RHYTHM LOGIC GPS")
-st.markdown('<p class="caption">MOBILE PUBLISHER | ENTERPRISE EDITION</p>', unsafe_allow_html=True)
-st.divider()
-
-# --- SIDEBAR EMERGENCY RESET ---
-with st.sidebar:
-    st.write("⚙️ **System Controls**")
-    if st.button("🔄 Reset Connection"):
-        for key in st.session_state.keys():
-            del st.session_state[key]
-        st.query_params.clear()
-        st.rerun()
-
-# --- MAIN LOGIC ---
+# --- 4. EXECUTION ---
 if "creds" not in st.session_state:
-    creds = authenticate_google()
+    creds = authenticate()
     if not creds:
-        # Show Login
-        st.info("🔒 Secure Cloud Workspace")
-        st.write("Connect to Google Drive to sync your voice notes.")
-        url = get_login_url()
-        st.markdown(f'<a href="{url}" target="_self"><div class="login-btn">👉 SIGN IN WITH GOOGLE</div></a>', unsafe_allow_html=True)
+        flow = get_auth_flow()
+        auth_url, _ = flow.authorization_url(prompt='consent')
+        
+        st.info("👇 STEP 2: CLICK TO TEST")
+        st.markdown(f"[**👉 ATTEMPT LOGIN**]({auth_url})")
+        
+        st.write("---")
+        st.caption("If you see a 403 Error, click 'Error Details' on that page.")
+        st.caption(f"It must say: redirect_uri={REAL_REDIRECT_URI}")
     else:
         st.session_state["creds"] = creds
         st.rerun()
 
 else:
-    # Logged In
+    st.success("✅ SUCCESS! The connection is fixed.")
+    st.write("Now we can add the recorder back.")
+    
+    # Simple Recorder Test
     service = build('drive', 'v3', credentials=st.session_state['creds'])
-    studio_folder_id = get_rhythm_logic_folder(service)
-    
-    st.subheader("🎙️ Dictation Studio")
-    st.success("Ready to record.")
-    
-    audio_value = st.audio_input("Record Chapter")
-    
+    audio_value = st.audio_input("Test Microphone")
     if audio_value:
-        with st.spinner("Syncing to Cloud..."):
-            upload_audio_draft(service, studio_folder_id, audio_value.getvalue())
-            st.toast("Saved to 'Rhythm Logic Studio'! 💾")
+        st.write("Uploading...")
+        file_metadata = {'name': 'Diagnostic_Test_Audio.wav'}
+        media = MediaIoBaseUpload(io.BytesIO(audio_value.getvalue()), mimetype='audio/wav')
+        service.files().create(body=file_metadata, media_body=media).execute()
+        st.toast("Upload Worked!")
