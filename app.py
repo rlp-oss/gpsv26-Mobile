@@ -4,26 +4,16 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
 
-# --- 1. CONFIGURATION ---
+# --- 1. SETUP ---
 st.set_page_config(page_title="Rhythm Logic GPS v26.0", page_icon="📱", layout="centered")
 
-# Custom Gold Branding
-st.markdown("""
-<style>
-    .stApp { background-color: #0e1117; color: white; }
-    .stButton button { width: 100%; border-radius: 20px; font-weight: bold; background-color: #d4af37; color: black; }
-    h1 { color: #d4af37; text-align: center; font-family: Impact, sans-serif; }
-    .caption { text-align: center; color: #888; font-size: 14px; }
-    .login-btn { background-color: #d4af37; color: black; padding: 15px 32px; text-align: center; display: block; font-size: 16px; border-radius: 12px; width: 100%; font-weight: bold; margin-top: 20px; text-decoration: none;}
-</style>
-""", unsafe_allow_html=True)
-
-# --- 2. THE "DEBUG" AUTH ENGINE (DO NOT TOUCH) ---
-# We are hardcoding the NO-SLASH URL because we verified this works.
+# --- 2. THE WORKING CONFIGURATION ---
+# We are using the exact URL that worked in your Debug test.
+# NO SLASH at the end.
 REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
 
 def get_auth_flow():
-    """Creates the connection using the working settings"""
+    """Creates the connection using the verified settings"""
     client_config = {
         "web": {
             "client_id": st.secrets["web"]["client_id"],
@@ -42,15 +32,14 @@ def get_auth_flow():
 def authenticate_google():
     flow = get_auth_flow()
     
-    # Check for the code in the URL
     if "code" in st.query_params:
         code = st.query_params["code"]
         try:
             flow.fetch_token(code=code)
-            st.query_params.clear() # Clear URL to prevent loop
+            st.query_params.clear()
             return flow.credentials
         except Exception as e:
-            # If token fetch fails, just return None (don't crash)
+            st.error(f"Login Failed: {e}")
             return None
     return None
 
@@ -59,66 +48,48 @@ def get_login_url():
     auth_url, _ = flow.authorization_url(prompt='consent')
     return auth_url
 
-# --- 3. GOOGLE DRIVE FUNCTIONS ---
-def get_rhythm_logic_folder(service):
-    try:
-        query = "name='Rhythm Logic Studio' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-        results = service.files().list(q=query, spaces='drive').execute()
-        items = results.get('files', [])
-        
-        if not items:
-            file_metadata = {'name': 'Rhythm Logic Studio', 'mimeType': 'application/vnd.google-apps.folder'}
-            folder = service.files().create(body=file_metadata, fields='id').execute()
-            return folder.get('id')
-        else:
-            return items[0]['id']
-    except:
-        return None
-
-def upload_audio_draft(service, folder_id, audio_bytes, chapter_name):
-    file_metadata = {'name': f"{chapter_name}_Audio_Draft.wav", 'parents': [folder_id]}
+# --- 3. DRIVE UPLOAD ---
+def upload_audio_draft(service, audio_bytes):
+    # Quick connect to Drive
+    file_metadata = {'name': 'Rhythm_Logic_Audio_Draft.wav'} 
     media = MediaIoBaseUpload(io.BytesIO(audio_bytes), mimetype='audio/wav')
-    service.files().create(body=file_metadata, media_body=media).execute()
+    file = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+    return file.get('id')
 
 # --- 4. THE UI ---
 st.title("Rhythm Logic GPS v26.0")
-st.markdown('<p class="caption">MOBILE PUBLISHER | ENTERPRISE EDITION</p>', unsafe_allow_html=True)
-st.divider()
+st.markdown("### 🚧 Integration Mode")
 
-# Check Session State
+# A. RESET BUTTON (Crucial for fixing the loop)
+if st.button("🔄 RESET / LOGOUT (Click this if stuck)"):
+    for key in st.session_state.keys():
+        del st.session_state[key]
+    st.query_params.clear()
+    st.rerun()
+
+# B. AUTHENTICATION
 if "creds" not in st.session_state:
     creds = authenticate_google()
+    
     if not creds:
-        # SHOW LOGIN
-        st.info("🔒 Secure Cloud Login Required")
-        login_url = get_login_url()
-        st.markdown(f'<a href="{login_url}" target="_self"><div class="login-btn">👉 SIGN IN WITH GOOGLE</div></a>', unsafe_allow_html=True)
+        url = get_login_url()
+        st.info(f"Targeting Redirect URI: {REDIRECT_URI}")
+        st.markdown(f'[👉 **CLICK HERE TO SIGN IN**]({url})')
+        st.caption("If you get a 403 error, click 'Request Details' on the error page and check the redirect_uri.")
     else:
-        # LOGGED IN SUCCESSFULLY
         st.session_state["creds"] = creds
         st.rerun()
+
+# C. THE STUDIO (Only shows if logged in)
 else:
-    # SHOW APP
-    try:
-        service = build('drive', 'v3', credentials=st.session_state['creds'])
-        
-        # Test connection silently first
-        studio_folder_id = get_rhythm_logic_folder(service)
-        
-        if studio_folder_id:
-            st.success("✅ Connected to Google Drive")
-            
-            st.subheader("🎙️ Dictation Studio")
-            audio_value = st.audio_input("Record Chapter")
-            
-            if audio_value:
-                st.write("Processing Audio...")
-                upload_audio_draft(service, studio_folder_id, audio_value.getvalue(), "New_Chapter")
-                st.toast("Saved to Drive! 💾")
-        else:
-            st.error("Could not connect to Drive. Please refresh.")
-            
-    except Exception as e:
-        st.error("Session expired. Please reload.")
-        del st.session_state["creds"]
-        st.rerun()
+    st.success("✅ YOU ARE IN.")
+    st.write("The connection is stable.")
+    
+    service = build('drive', 'v3', credentials=st.session_state['creds'])
+    
+    audio_value = st.audio_input("Record Chapter")
+    
+    if audio_value:
+        with st.spinner("Uploading to Drive root folder..."):
+            file_id = upload_audio_draft(service, audio_value.getvalue())
+            st.success(f"Uploaded! File ID: {file_id}")
