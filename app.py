@@ -21,17 +21,17 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (FIXED WITH SLASH) ---
+# --- 2. AUTHENTICATION (The Configuration That Worked) ---
 
-# WE ADD THE SLASH HERE TO MATCH YOUR BROWSER
-REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app/"
+# WE USE THE NO-SLASH VERSION THAT GAVE YOU SUCCESS
+REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
 
 def authenticate_google():
     """Handles the secure login flow"""
     
-    # We ignore the secrets file URI and force the correct one here
     client_config = {
         "web": {
+            # We still need the ID/Secret from secrets, but we FORCE the URI
             "client_id": st.secrets["web"]["client_id"],
             "client_secret": st.secrets["web"]["client_secret"],
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -53,7 +53,8 @@ def authenticate_google():
             st.query_params.clear()
             return flow.credentials
         except Exception as e:
-            st.error(f"Login Error: {e}")
+            # If it fails, we clear params to prevent a loop
+            st.query_params.clear()
             return None
         
     return None
