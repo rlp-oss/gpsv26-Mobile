@@ -4,13 +4,10 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 import io
 
-# --- 1. SETUP & BRANDING ---
-st.set_page_config(
-    page_title="Rhythm Logic GPS v26.0", 
-    page_icon="📱", 
-    layout="centered"
-)
+# --- 1. CONFIGURATION ---
+st.set_page_config(page_title="Rhythm Logic GPS v26.0", page_icon="📱", layout="centered")
 
+# Custom Gold Branding
 st.markdown("""
 <style>
     .stApp { background-color: #0e1117; color: white; }
@@ -21,17 +18,14 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. AUTHENTICATION (The Configuration That Worked) ---
-
-# WE USE THE NO-SLASH VERSION THAT GAVE YOU SUCCESS
+# --- 2. THE "DEBUG" AUTH ENGINE (DO NOT TOUCH) ---
+# We are hardcoding the NO-SLASH URL because we verified this works.
 REDIRECT_URI = "https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app"
 
-def authenticate_google():
-    """Handles the secure login flow"""
-    
+def get_auth_flow():
+    """Creates the connection using the working settings"""
     client_config = {
         "web": {
-            # We still need the ID/Secret from secrets, but we FORCE the URI
             "client_id": st.secrets["web"]["client_id"],
             "client_secret": st.secrets["web"]["client_secret"],
             "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -39,90 +33,92 @@ def authenticate_google():
             "redirect_uris": [REDIRECT_URI],
         }
     }
-
-    flow = Flow.from_client_config(
+    return Flow.from_client_config(
         client_config,
         scopes=['https://www.googleapis.com/auth/drive.file'],
         redirect_uri=REDIRECT_URI
     )
 
+def authenticate_google():
+    flow = get_auth_flow()
+    
+    # Check for the code in the URL
     if "code" in st.query_params:
         code = st.query_params["code"]
         try:
             flow.fetch_token(code=code)
-            st.query_params.clear()
+            st.query_params.clear() # Clear URL to prevent loop
             return flow.credentials
         except Exception as e:
-            # If it fails, we clear params to prevent a loop
-            st.query_params.clear()
+            # If token fetch fails, just return None (don't crash)
             return None
-        
     return None
 
 def get_login_url():
-    client_config = {
-        "web": {
-            "client_id": st.secrets["web"]["client_id"],
-            "client_secret": st.secrets["web"]["client_secret"],
-            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-            "token_uri": "https://oauth2.googleapis.com/token",
-            "redirect_uris": [REDIRECT_URI],
-        }
-    }
-    flow = Flow.from_client_config(
-        client_config,
-        scopes=['https://www.googleapis.com/auth/drive.file'],
-        redirect_uri=REDIRECT_URI
-    )
+    flow = get_auth_flow()
     auth_url, _ = flow.authorization_url(prompt='consent')
     return auth_url
 
-# --- 3. DRIVE LOGIC ---
-
+# --- 3. GOOGLE DRIVE FUNCTIONS ---
 def get_rhythm_logic_folder(service):
-    query = "name='Rhythm Logic Studio' and mimeType='application/vnd.google-apps.folder' and trashed=false"
-    results = service.files().list(q=query, spaces='drive').execute()
-    items = results.get('files', [])
-    
-    if not items:
-        file_metadata = {'name': 'Rhythm Logic Studio', 'mimeType': 'application/vnd.google-apps.folder'}
-        folder = service.files().create(body=file_metadata, fields='id').execute()
-        return folder.get('id')
-    else:
-        return items[0]['id']
+    try:
+        query = "name='Rhythm Logic Studio' and mimeType='application/vnd.google-apps.folder' and trashed=false"
+        results = service.files().list(q=query, spaces='drive').execute()
+        items = results.get('files', [])
+        
+        if not items:
+            file_metadata = {'name': 'Rhythm Logic Studio', 'mimeType': 'application/vnd.google-apps.folder'}
+            folder = service.files().create(body=file_metadata, fields='id').execute()
+            return folder.get('id')
+        else:
+            return items[0]['id']
+    except:
+        return None
 
 def upload_audio_draft(service, folder_id, audio_bytes, chapter_name):
     file_metadata = {'name': f"{chapter_name}_Audio_Draft.wav", 'parents': [folder_id]}
     media = MediaIoBaseUpload(io.BytesIO(audio_bytes), mimetype='audio/wav')
     service.files().create(body=file_metadata, media_body=media).execute()
 
-# --- 4. APP INTERFACE ---
-
+# --- 4. THE UI ---
 st.title("Rhythm Logic GPS v26.0")
 st.markdown('<p class="caption">MOBILE PUBLISHER | ENTERPRISE EDITION</p>', unsafe_allow_html=True)
 st.divider()
 
+# Check Session State
 if "creds" not in st.session_state:
     creds = authenticate_google()
     if not creds:
+        # SHOW LOGIN
         st.info("🔒 Secure Cloud Login Required")
         login_url = get_login_url()
         st.markdown(f'<a href="{login_url}" target="_self"><div class="login-btn">👉 SIGN IN WITH GOOGLE</div></a>', unsafe_allow_html=True)
     else:
+        # LOGGED IN SUCCESSFULLY
         st.session_state["creds"] = creds
         st.rerun()
-
 else:
-    service = build('drive', 'v3', credentials=st.session_state['creds'])
-    with st.spinner("Syncing..."):
+    # SHOW APP
+    try:
+        service = build('drive', 'v3', credentials=st.session_state['creds'])
+        
+        # Test connection silently first
         studio_folder_id = get_rhythm_logic_folder(service)
-    
-    st.success(f"✅ Connected to Drive")
-    st.subheader("🎙️ Dictation Studio")
-    
-    audio_value = st.audio_input("Record Chapter")
-    
-    if audio_value:
-        st.write("Processing Audio...")
-        upload_audio_draft(service, studio_folder_id, audio_value.getvalue(), "New_Chapter")
-        st.toast("Saved to Drive! 💾")
+        
+        if studio_folder_id:
+            st.success("✅ Connected to Google Drive")
+            
+            st.subheader("🎙️ Dictation Studio")
+            audio_value = st.audio_input("Record Chapter")
+            
+            if audio_value:
+                st.write("Processing Audio...")
+                upload_audio_draft(service, studio_folder_id, audio_value.getvalue(), "New_Chapter")
+                st.toast("Saved to Drive! 💾")
+        else:
+            st.error("Could not connect to Drive. Please refresh.")
+            
+    except Exception as e:
+        st.error("Session expired. Please reload.")
+        del st.session_state["creds"]
+        st.rerun()
