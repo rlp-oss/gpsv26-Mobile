@@ -65,13 +65,14 @@ if not api_key:
         st.info("Need a key? Get it free: https://aistudio.google.com/app/apikey")
         st.stop()
 
-# --- 3. THE AI ENGINE ---
+# --- 3. THE AI ENGINE (UPDATED MODEL) ---
 def engineer_content(audio_file, mode, key):
     """Sends audio to Gemini and returns professional text."""
     genai.configure(api_key=key)
     
-    # Using Flash for speed and reliability
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # WE UPDATED THIS TO A MODEL FROM YOUR APPROVED LIST
+    # Gemini 2.0 Flash is faster and supports audio input perfectly.
+    model = genai.GenerativeModel('gemini-2.0-flash')
 
     prompt = f"""
     You are an expert Ghostwriter for Rhythm Logic.
@@ -139,7 +140,7 @@ if audio_data:
             # Display Result
             st.text_area("Final Output", result, height=350)
             
-            # DOWNLOAD BUTTON (Safe Alternative to Drive)
+            # DOWNLOAD BUTTON
             st.download_button(
                 label="💾 Download Text File",
                 data=result,
