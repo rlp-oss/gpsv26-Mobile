@@ -40,23 +40,22 @@ st.markdown("""
     /* Input Fields */
     .stTextInput input { border-radius: 10px; }
     .stSelectbox div[data-baseweb="select"] { border-radius: 10px; }
+    .stTextArea textarea { border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("Rhythm Logic GPS")
 st.markdown("### The Professional's Ghostwriter")
 
-# --- 2. SECURITY CHECK (Simple & Unbreakable) ---
+# --- 2. SECURITY CHECK ---
 api_key = None
 
-# Check Secrets First
 try:
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
 except:
     pass
 
-# If no secret, ask manually (Prevents crashing)
 if not api_key:
     st.warning("🔒 Security Check")
     api_key = st.text_input("Enter Gemini API Key:", type="password", placeholder="Paste key here...")
@@ -65,22 +64,48 @@ if not api_key:
         st.info("Need a key? Get it free: https://aistudio.google.com/app/apikey")
         st.stop()
 
-# --- 3. THE AI ENGINE (UPDATED MODEL) ---
-def engineer_content(audio_file, mode, key):
-    """Sends audio to Gemini and returns professional text."""
+# --- 3. SESSION STATE (The Memory) ---
+# This keeps your work safe so you can "chat" with the AI without losing the lyrics.
+if "history" not in st.session_state:
+    st.session_state["history"] = ""
+if "last_draft" not in st.session_state:
+    st.session_state["last_draft"] = ""
+
+# --- 4. THE AI ENGINE ---
+def engineer_content(audio_file, mode, key, current_draft=""):
+    """Sends audio to Gemini and returns professional text + Questions."""
     genai.configure(api_key=key)
-    
-    # WE UPDATED THIS TO A MODEL FROM YOUR APPROVED LIST
-    # Gemini 2.0 Flash is faster and supports audio input perfectly.
     model = genai.GenerativeModel('gemini-2.0-flash')
 
-    prompt = f"""
-    You are an expert Ghostwriter for Rhythm Logic.
-    1. Listen to the user's audio.
-    2. Transcribe it perfectly.
-    3. REWRITE it into this professional format: {mode}.
-    4. Ensure the tone is polished and ready for publication.
-    """
+    # If this is a refinement (we already have text), we change the prompt
+    if current_draft:
+        prompt = f"""
+        You are an expert Ghostwriter for Rhythm Logic.
+        The user wants to refine their current draft based on new instructions.
+        
+        CURRENT DRAFT:
+        {current_draft}
+        
+        USER INSTRUCTION (Audio):
+        Listen to the audio instructions and update the draft accordingly.
+        
+        OUTPUT FORMAT:
+        1. The Updated Draft.
+        2. "Rhythm Logic Strategy": Ask 3 short, punchy questions about what the user wants to do next (e.g., "Add a bridge?", "Change the tone?", "Expand the second verse?").
+        """
+    else:
+        # First time generation
+        prompt = f"""
+        You are an expert Ghostwriter for Rhythm Logic.
+        1. Listen to the user's audio.
+        2. Transcribe it perfectly.
+        3. REWRITE it into this professional format: {mode}.
+        
+        CRITICAL STEP:
+        At the bottom of your response, create a section called "🔮 RHYTHM LOGIC STRATEGY".
+        In this section, ask the user 3 strategic questions to help them expand the piece.
+        Example: "Do you want me to write a Bridge for this?", "Should we make the second verse darker?", "Do you want a counter-melody?"
+        """
 
     try:
         response = model.generate_content([
@@ -91,7 +116,31 @@ def engineer_content(audio_file, mode, key):
     except Exception as e:
         return f"Error: {e}"
 
-# --- 4. THE INTERFACE ---
+def text_refinement(instruction_text, current_draft, key):
+    """Allows text-based chatting to update the draft."""
+    genai.configure(api_key=key)
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    
+    prompt = f"""
+    You are an expert Ghostwriter. Update the draft based on the user's text request.
+    
+    CURRENT DRAFT:
+    {current_draft}
+    
+    USER REQUEST:
+    {instruction_text}
+    
+    OUTPUT FORMAT:
+    1. The Updated Draft.
+    2. "🔮 RHYTHM LOGIC STRATEGY": 3 new questions for the next step.
+    """
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except Exception as e:
+        return f"Error: {e}"
+
+# --- 5. THE INTERFACE ---
 st.divider()
 
 # Mode Selection
@@ -103,13 +152,12 @@ mode = st.selectbox(
         "Business Email", 
         "Medical Note (SOAP)",
         "Legal Brief",
-        "Blog Post",
-        "Book Chapter"
+        "Blog Post"
     ]
 )
 
-# Audio Inputs (Clean Tabs)
-st.write("") # Spacing
+# Audio Inputs
+st.write("") 
 tab1, tab2 = st.tabs(["🎙️ RECORD", "📂 UPLOAD"])
 
 audio_data = None
@@ -124,26 +172,49 @@ with tab2:
     if uploaded_file:
         audio_data = uploaded_file
 
-# --- 5. ACTION & SAVE ---
+# --- 6. ACTION & DISPLAY ---
+
 if audio_data:
     st.divider()
     if st.button("⚡ ENGAGE RHYTHM LOGIC"):
-        with st.spinner("🎧 Listening & Engineering..."):
-            result = engineer_content(audio_data, mode, api_key)
+        with st.spinner("🎧 Listening & Strategizing..."):
+            # We pass the existing draft if we have one, to allow audio refinements
+            result = engineer_content(audio_data, mode, api_key, st.session_state["last_draft"])
         
         if "Error" in result:
-            st.error("Connection Error. Please check your API Key.")
             st.error(result)
         else:
-            st.success("Draft Complete")
-            
-            # Display Result
-            st.text_area("Final Output", result, height=350)
-            
-            # DOWNLOAD BUTTON
-            st.download_button(
-                label="💾 Download Text File",
-                data=result,
-                file_name=f"Rhythm_Logic_{mode.split()[0]}.txt",
-                mime="text/plain"
-            )
+            st.session_state["last_draft"] = result # Save to memory
+            st.rerun() # Refresh to show the result in the editor below
+
+# DISPLAY RESULTS (If they exist in memory)
+if st.session_state["last_draft"]:
+    st.success("Draft & Strategy Generated")
+    
+    # 1. The Output Box (Editable)
+    edited_text = st.text_area("Live Editor", st.session_state["last_draft"], height=400)
+    st.session_state["last_draft"] = edited_text # Allow manual edits to stick
+
+    st.download_button(
+        label="💾 Download Draft",
+        data=st.session_state["last_draft"],
+        file_name="Rhythm_Logic_Draft.txt",
+        mime="text/plain"
+    )
+
+    st.divider()
+    
+    # 2. The Director's Chair (Refinement)
+    st.markdown("### 🎬 Director's Chair")
+    st.caption("Answer the AI's questions above, or give new instructions (e.g., 'Write a bridge based on Question 1')")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        refinement_instruction = st.text_input("Tell Rhythm Logic what to do next...", label_visibility="collapsed", placeholder="Ex: Add a chorus about heartbreak...")
+    with col2:
+        if st.button("🔄 Update"):
+            if refinement_instruction:
+                with st.spinner("Rewriting..."):
+                    new_version = text_refinement(refinement_instruction, st.session_state["last_draft"], api_key)
+                    st.session_state["last_draft"] = new_version
+                    st.rerun()
