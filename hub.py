@@ -132,8 +132,8 @@ with tabs[0]:
     # Grid Layout
     cols = st.columns(3)
     for i, app in enumerate(filtered_apps):
-        with cols[i % 3]:
-            tag_class = "badge-ent" if app['tag'] == "RHYTHMLOGIC" else "badge-app"
+        with cols[i % 3]:  # 
+            tag_class = "badge-ent" if app['tag'] == "ENTERPRISE" else "badge-app"
             st.markdown(f"""
             <div class='app-card'>
                 <div>
