@@ -102,7 +102,7 @@ col1, col2, col3 = st.columns([1, 4, 1]) # Centers the video
 with col2:
     st.markdown("<div class='video-box'>", unsafe_allow_html=True)
     # REPLACE THIS LINK WITH YOUR OWN VIDEO
-    st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
+    st.video("https://www.youtube.com/watch?v=O__reqiqvrM") 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # --- THE CALL TO ACTION BUTTON ---
