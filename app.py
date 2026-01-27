@@ -8,7 +8,7 @@ import io
 import time
 
 # --- 1. CONFIGURATION ---
-st.set_page_config(page_title="Rhythm Logic GPS", page_icon="🧭", layout="centered")
+st.set_page_config(page_title="RL GPS v26 Mobile", page_icon="🧭", layout="centered")
 
 st.markdown("""
 <style>
@@ -21,17 +21,17 @@ st.markdown("""
     .director-box { border: 1px solid #444; padding: 20px; border-radius: 15px; background-color: #1e1e1e; margin-top: 20px;}
     
     /* Gumroad Paywall Styles */
-    .paywall-box { border: 2px solid #ff90e8; /* Gumroad Pink Accent */ padding: 30px; border-radius: 20px; text-align: center; background-color: #1a1a1a; margin-top: 50px; }
+    .paywall-box { border: 2px solid #ff90e8; padding: 30px; border-radius: 20px; text-align: center; background-color: #1a1a1a; margin-top: 50px; }
     .price-tag { font-size: 40px; color: #d4af37; font-weight: bold; }
     .per-month { font-size: 16px; color: #aaa; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- 2. BUSINESS CONFIGURATION ---
-# 🔴 REPLACE THIS WITH YOUR GUMROAD PRODUCT LINK
-GUMROAD_LINK = "https://rhythmlogic.gumroad.com/l/dldqoy" 
+# 🔴 UPDATE THIS WITH YOUR SPECIFIC GUMROAD LINK FROM THE SCREENSHOT
+GUMROAD_LINK = "https://rhythmlogic.gumroad.com/l/YOUR_PRODUCT_ID" 
 
-# 🔴 THIS IS THE MASTER PASSWORD YOU EMAIL TO SUBSCRIBERS
+# 🔴 MASTER PASSWORD
 ACCESS_CODE = "RHYTHM2026" 
 
 # --- 3. SESSION STATE ---
@@ -44,13 +44,13 @@ if "refine_text_input" not in st.session_state: st.session_state.refine_text_inp
 
 # --- 4. THE PAYWALL ---
 def show_paywall():
-    st.title("RHYTHM LOGIC GPS")
-    st.markdown("### The Professional's Ghostwriter")
+    st.title("RL GPS v26")
+    st.markdown("### Pocket Publisher")
     
     st.markdown(f"""
     <div class='paywall-box'>
         <h2>Pro Access Required</h2>
-        <p>Unlock the full AI studio for book chapters, lyrics, and more.</p>
+        <p>Unlock the full AI studio.</p>
         <div class='price-tag'>$20<span class='per-month'>/mo</span></div>
         <br>
         <a href="{GUMROAD_LINK}" target="_blank">
@@ -74,7 +74,7 @@ def show_paywall():
             time.sleep(1)
             st.rerun()
         else:
-            st.error("Invalid Code. Please check your Gumroad receipt or subscribe above.")
+            st.error("Invalid Code.")
 
 if not st.session_state.authenticated:
     show_paywall()
@@ -96,28 +96,33 @@ if not api_key:
     api_key = st.text_input("Enter Gemini API Key:", type="password")
     if not api_key: st.stop()
 
-# --- AI ENGINE (Anti-Crash) ---
+# --- AI ENGINE (ANTI-CRASH + STRATEGY) ---
 def retry_generation(model, contents):
+    """
+    Prevents the 'ResourceExhausted' red screen by retrying automatically.
+    """
     max_retries = 3
     for attempt in range(max_retries):
         try:
             response = model.generate_content(contents)
             return response.text
         except exceptions.ResourceExhausted:
-            time.sleep(4)
+            time.sleep(4) # Wait 4 seconds and try again
             continue
         except Exception as e:
             return f"Error: {e}"
-    return "⚠️ Google is busy. Wait a moment."
+    return "⚠️ High Traffic: Google is busy. Please wait 10 seconds and try again."
 
 def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
     
+    # THIS MANDATE FORCES THE QUESTIONS YOU WANTED IN THE VIDEO
     strategy_mandate = """
     CRITICAL OUTPUT RULE:
     You must END your response with a section called "🔮 RHYTHM LOGIC STRATEGY".
     In this section, ask the user 3 specific, strategic questions about what to do next.
+    Example: "Do you want to add a bridge?" or "Should we change the tone?"
     NEVER output just the text. ALWAYS output the text + the questions.
     """
 
@@ -136,7 +141,14 @@ def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
 def text_refinement(instruction, current_draft, key, is_audio=False):
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
-    base_prompt = f"Update the draft based on instruction.\nCRITICAL: Add '🔮 RHYTHM LOGIC STRATEGY' section.\nDRAFT:\n{current_draft}"
+    
+    # Enforcing the mandate here too
+    strategy_mandate = """
+    CRITICAL OUTPUT RULE:
+    After updating the text, add a "🔮 RHYTHM LOGIC STRATEGY" section with 3 questions on what to do next.
+    """
+    
+    base_prompt = f"Update the draft based on instruction.\n{strategy_mandate}\nDRAFT:\n{current_draft}"
     
     if is_audio: payload = [base_prompt, {"mime_type": "audio/mp3", "data": instruction.read()}]
     else: payload = f"{base_prompt}\nUSER INSTRUCTION: {instruction}"
@@ -145,7 +157,7 @@ def text_refinement(instruction, current_draft, key, is_audio=False):
 
 # --- APP FLOW ---
 with st.sidebar:
-    st.success("✅ **Pro Member Active**")
+    st.success("✅ **Pro Member**")
     if st.button("Log Out"):
         st.session_state.authenticated = False
         st.rerun()
@@ -159,9 +171,9 @@ with st.sidebar:
 
 # STEP 1
 if st.session_state.step == 1:
-    st.title("RHYTHM LOGIC GPS")
+    st.title("RL GPS v26")
     st.write("")
-    st.markdown("## 1. What can I help you write today?")
+    st.markdown("## 1. What are we writing?")
     st.write("")
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
@@ -174,9 +186,9 @@ if st.session_state.step == 1:
 
 # STEP 2
 elif st.session_state.step == 2:
-    st.title("RHYTHM LOGIC GPS")
+    st.title("RL GPS v26")
     st.markdown(f"## 2. Project: **{st.session_state.project_type}**")
-    st.markdown("<p class='step-text'>Choose your Ghostwriter Mode:</p>", unsafe_allow_html=True)
+    st.markdown("<p class='step-text'>Choose Mode:</p>", unsafe_allow_html=True)
     style = st.radio("Workflow:", ["✨ Spark Me (Inspiration)", "🤝 Co-Pilot (Teamwork)", "🎓 Solo (Advice Only)"])
     st.write("")
     if st.button("Enter Studio 🚀"):
@@ -191,7 +203,7 @@ elif st.session_state.step == 3:
     st.divider()
 
     if not st.session_state.last_draft:
-        tab1, tab2 = st.tabs(["🔴 Record Initial Idea", "📂 Upload File"])
+        tab1, tab2 = st.tabs(["🔴 Record Idea", "📂 Upload File"])
         audio_data = None
         with tab1:
             audio_rec = st.audio_input("Record Audio")
