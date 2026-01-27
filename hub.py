@@ -133,7 +133,7 @@ with tabs[0]:
     cols = st.columns(3)
     for i, app in enumerate(filtered_apps):
         with cols[i % 3]:
-            tag_class = "badge-ent" if app['tag'] == "ENTERPRISE" else "badge-app"
+            tag_class = "badge-ent" if app['tag'] == "RHYTHMLOGIC" else "badge-app"
             st.markdown(f"""
             <div class='app-card'>
                 <div>
