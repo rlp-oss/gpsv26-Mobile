@@ -5,7 +5,7 @@ import time
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="The Pocket School", page_icon="🌍", layout="centered")
 
-# --- CUSTOM STYLING (Low Data / High Contrast) ---
+# --- CUSTOM STYLING ---
 st.markdown("""
 <style>
     .stApp { background-color: #fcfcfc; color: #111; }
@@ -18,107 +18,117 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         margin-top: 20px;
     }
+    .status-badge {
+        font-size: 12px;
+        background-color: #e8f5e9;
+        color: #2e7d32;
+        padding: 4px 8px;
+        border-radius: 4px;
+        border: 1px solid #c8e6c9;
+        margin-bottom: 10px;
+        display: inline-block;
+    }
     .stButton button { width: 100%; background-color: #2e7d32; color: white; font-weight: bold; padding: 12px; }
     .stButton button:hover { background-color: #1b5e20; }
-    .info-text { font-size: 12px; color: #666; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SIDEBAR: SETTINGS ---
-with st.sidebar:
-    st.header("⚙️ School Settings")
-    
-    # Get API Key from Secrets or User Input
-    try:
-        api_key = st.secrets["OPENROUTER_API_KEY"]
-    except:
-        api_key = st.text_input("Enter OpenRouter API Key:", type="password")
-        
-    st.markdown("---")
-    # Dropdown to choose model (OpenRouter gives you choices)
-    model_choice = st.selectbox(
-        "Select AI Teacher:", 
-        ["google/gemini-2.0-flash-exp:free", "meta-llama/llama-3-8b-instruct:free", "mistralai/mistral-7b-instruct:free"],
-        index=0
-    )
-    
-    st.info("ℹ️ **Note:** These models are currently FREE via OpenRouter.")
+# --- SETUP CREDENTIALS ---
+# We look for OPENROUTER_API_KEY in secrets
+if "OPENROUTER_API_KEY" in st.secrets:
+    api_key = st.secrets["OPENROUTER_API_KEY"]
+else:
+    st.error("🔑 Critical Error: OPENROUTER_API_KEY missing from secrets.")
+    st.stop()
 
-# --- MAIN INTERFACE ---
+# --- THE "SAFE" MODEL LIST (OpenRouter IDs) ---
+# This list tries FREE Google models first, then cheap ones.
+MODEL_CASCADE = [
+    "google/gemini-2.0-flash-exp:free",      # Priority 1: Smart & Free
+    "google/gemini-2.0-flash-lite-preview-02-05:free", # Priority 2: Fast & Free
+    "google/gemini-flash-1.5",               # Priority 3: Cheap Paid (Backup)
+    "meta-llama/llama-3-8b-instruct:free",   # Priority 4: Non-Google Backup (Free)
+]
+
+# --- UI LAYOUT ---
 st.title("🌍 The Pocket School")
-st.markdown("**Universal Education Engine.** Type your region, pick a subject, and get a lesson plan tailored to your culture.")
+st.markdown("**Universal Education Engine.** Powered by OpenRouter.")
 
-# --- INPUTS ---
 col1, col2 = st.columns(2)
 with col1:
-    student_age = st.selectbox("Student Age", ["6-8 Years (Primary)", "9-11 Years (Middle)", "12-14 Years (Junior Secondary)", "15+ Years (Senior)"])
+    student_age = st.selectbox("Student Age", ["6-8 Years", "9-11 Years", "12-14 Years", "15+ Years"])
 with col2:
-    subject = st.selectbox("Subject", ["Mathematics", "Science", "English/Reading", "Social Studies", "History", "Business/Trade"])
+    subject = st.selectbox("Subject", ["Mathematics", "Science", "English/Reading", "Social Studies", "Business"])
 
-region = st.text_input("📍 Local Region (Crucial for Context):", "Lagos, Nigeria", help="Enter the city or country. The AI will use local currency, names, and geography.")
-topic_drill = st.text_input("Specific Topic (Optional):", placeholder="e.g. Photosynthesis, Fractions, The Civil War")
+region = st.text_input("📍 Region:", "Lagos, Nigeria", help="Enter city/country. The AI adapts the lesson to this location.")
+topic_drill = st.text_input("Specific Topic (Optional):", placeholder="e.g. Fractions, Photosynthesis")
 
-# --- AI GENERATION LOGIC ---
-def generate_lesson(key, model, age, subj, loc, topic):
-    
-    # Configure OpenRouter Client
+# --- ROBUST GENERATION FUNCTION ---
+def generate_lesson_cascade(key, age, subj, loc, topic):
     client = OpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=key,
     )
-    
-    # The Prompt: Forces the AI to be a "Local Teacher"
-    prompt = f"""
-    Act as an expert primary/secondary school teacher located in {loc}.
-    Create a detailed, culturally relevant lesson plan for a student aged {age} about {subj}.
-    
-    SPECIFIC TOPIC: {topic if topic else "Choose a fundamental topic for this age group"}
-    
-    CRITICAL RULES:
-    1. **Context is King:** You MUST use local names (e.g., if in Nigeria, use Emeka or Chioma), local currency (e.g., Naira), local foods (e.g., Jollof, Yams), and local geography.
-    2. **No Western Default:** Do not use dollars, apples, or snow unless relevant to {loc}.
-    3. **Tone:** Encouraging, clear, and authoritative but kind.
-    4. **Structure:**
-       - **Topic Title** (Bold)
-       - **The 2-Minute Lesson:** A clear explanation of the concept using simple language.
-       - **Real-World Example:** Explain the concept using a daily life scenario in {loc}.
-       - **Interactive Activity:** Something the student can do right now without buying supplies (e.g., "Go outside and count the red cars").
-       - **Pop Quiz:** 3 Questions to test understanding.
-    """
-    
-    with st.spinner(f"👩‍🏫 Teacher is writing the lesson plan for {loc}..."):
-        completion = client.chat.completions.create(
-            model=model,
-            messages=[
-                {"role": "system", "content": "You are a helpful, culturally aware local teacher."},
-                {"role": "user", "content": prompt}
-            ],
-            # OpenRouter required headers
-            extra_headers={
-                "HTTP-Referer": "https://rhythm-logic.com", 
-                "X-Title": "The Pocket School",
-            },
-        )
-        return completion.choices[0].message.content
 
-# --- THE TRIGGER ---
-if st.button("🎓 Generate Lesson Plan"):
-    if not api_key:
-        st.error("Please provide an OpenRouter API Key in the sidebar.")
-        st.stop()
-        
+    prompt = f"""
+    Act as an expert teacher in {loc}. Create a lesson plan for age {age} on {subj}.
+    TOPIC: {topic if topic else "Fundamental Concept"}
+    
+    RULES:
+    1. Use local names, currency, food, and places from {loc}.
+    2. NO supplies needed. Text only.
+    3. Structure: 
+       - **Topic**
+       - **Concept (2 mins)**
+       - **Real Life Example (in {loc})**
+       - **Activity (No supplies)**
+       - **Quiz (3 Questions)**
+    """
+
+    last_error = None
+    
+    for model_name in MODEL_CASCADE:
+        try:
+            # Update UI status
+            status_placeholder.markdown(f"<span class='status-badge'>📡 Contacting: {model_name}...</span>", unsafe_allow_html=True)
+            
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {"role": "system", "content": "You are a helpful local teacher."},
+                    {"role": "user", "content": prompt}
+                ],
+                extra_headers={
+                    "HTTP-Referer": "https://rhythm-logic.com", 
+                    "X-Title": "The Pocket School",
+                },
+            )
+            
+            # If successful, return text and model name
+            return completion.choices[0].message.content, model_name
+            
+        except Exception as e:
+            # If it fails (429 or other), print error and try next model
+            print(f"⚠️ Model {model_name} failed: {e}")
+            last_error = e
+            continue 
+            
+    # If ALL models fail
+    raise last_error
+
+# --- MAIN ACTION ---
+status_placeholder = st.empty()
+
+if st.button("🎓 Generate Lesson"):
     try:
-        lesson_output = generate_lesson(api_key, model_choice, student_age, subject, region, topic_drill)
+        with st.spinner("Preparing class materials..."):
+            lesson_content, successful_model = generate_lesson_cascade(api_key, student_age, subject, region, topic_drill)
         
-        # Display Result
-        st.markdown(f"<div class='lesson-box'>{lesson_output}</div>", unsafe_allow_html=True)
-        
-        # Save/Export Option
-        st.download_button("💾 Download Lesson (Text)", lesson_output, file_name="Lesson_Plan.txt")
+        # Success
+        status_placeholder.empty()
+        st.success(f"Class is in session! (Teacher: {successful_model})")
+        st.markdown(f"<div class='lesson-box'>{lesson_content}</div>", unsafe_allow_html=True)
         
     except Exception as e:
-        st.error(f"Class cancelled. Error: {e}")
-
-# --- FOOTER ---
-st.divider()
-st.markdown("<p style='text-align: center; class: info-text;'>Built with ❤️ by Rhythm Logic for the world.</p>", unsafe_allow_html=True)
+        status_placeholder.empty()
+        st.error(f"School is temporarily closed. All satellites busy. ({e})")
