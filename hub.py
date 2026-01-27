@@ -68,10 +68,10 @@ st.markdown("""
 
 # 1. SOFTWARE (From your Gumroad Screenshot)
 SOFTWARE = [
-    {"name": "RL Global Academy", "desc": "The Global Education Tool Free For The World Web App (Mobile or Desktop) .", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogicglobalacademy.streamlit.app/"},
-    {"name": "Rhythm Logic Software", "desc": "The Official Rhythm Logic Sales Page.", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogic.gumroad.com/?_gl=1*1ydx5o7*_ga*MTA1MTI1MTMxNi4xNzY5NDcyMDQ4*_ga_6LJN6D94N6*czE3Njk1NDc4NzMkbzUkZzEkdDE3Njk1NDc4NzgkajU1JGwwJGgw"},
-    {"name": "Rhythm Logic Publishing", "desc": "Fast Professional Full Stack Publishing Services", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogicpublishing.com/"},
-    {"name": "Rhythm Logic Mobile", "desc": "The Pocket Publisher. Write books on the go.", "tag": "MOBILE APP", "url": "https://gpsv26-mobile.streamlit.app/"},
+    {"name": "RL Global Academy", "desc": "The Global Education Tool Free For The World Web App (Mobile or Desktop) .", "tag": "ENTERPRISE", "url": "https://rhythmlogicglobalacademy.streamlit.app/"},
+    {"name": "Rhythm Logic Software", "desc": "The Official Rhythm Logic Sales Page.", "tag": "ENTERPRISE", "url": "https://rhythmlogic.gumroad.com/?_gl=1*1ydx5o7*_ga*MTA1MTI1MTMxNi4xNzY5NDcyMDQ4*_ga_6LJN6D94N6*czE3Njk1NDc4NzMkbzUkZzEkdDE3Njk1NDc4NzgkajU1JGwwJGgw"},
+    {"name": "Rhythm Logic Publishing", "desc": "Fast Professional Full Stack Publishing Services", "tag": "ENTERPRISE", "url": "https://rhythmlogicpublishing.com/"},
+    {"name": "Rhythm Logic Mobile", "desc": "The Pocket Publisher. Write books on the go.", "tag": "ENTERPRISE", "url": "https://gpsv26-mobile.streamlit.app/"},
     # Add your other 30 titles here...
 ]
 
