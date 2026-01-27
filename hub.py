@@ -68,27 +68,26 @@ st.markdown("""
 
 # 1. SOFTWARE (From your Gumroad Screenshot)
 SOFTWARE = [
-    {"name": "RL Enterprise GPS", "desc": "The complete commercial logic engine for businesses.", "tag": "ENTERPRISE", "url": "YOUR_GUMROAD_LINK"},
-    {"name": "RL Biz Creator", "desc": "Automated business plan and strategy generator.", "tag": "ENTERPRISE", "url": "YOUR_GUMROAD_LINK"},
-    {"name": "RL Enterprise Gem", "desc": "Advanced gemini-powered logic handling.", "tag": "ENTERPRISE", "url": "YOUR_GUMROAD_LINK"},
-    {"name": "RL Identity", "desc": "Brand voice and identity management system.", "tag": "ENTERPRISE", "url": "YOUR_GUMROAD_LINK"},
-    {"name": "Rhythm Logic Mobile", "desc": "The Pocket Publisher. Write books on the go.", "tag": "MOBILE APP", "url": "https://rhythm-logic-live.streamlit.app/"},
+    {"name": "RL Global Academy", "desc": "The Global Education Tool Free For The World Web App (Mobile or Desktop) .", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogicglobalacademy.streamlit.app/"},
+    {"name": "Rhythm Logic Software", "desc": "The Official Rhythm Logic Sales Page.", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogic.gumroad.com/?_gl=1*1ydx5o7*_ga*MTA1MTI1MTMxNi4xNzY5NDcyMDQ4*_ga_6LJN6D94N6*czE3Njk1NDc4NzMkbzUkZzEkdDE3Njk1NDc4NzgkajU1JGwwJGgw"},
+    {"name": "Rhythm Logic Publishing", "desc": "Fast Professional Full Stack Publishing Services", "tag": "RHYTHMLOGIC", "url": "https://rhythmlogicpublishing.com/"},
+    {"name": "Rhythm Logic Mobile", "desc": "The Pocket Publisher. Write books on the go.", "tag": "MOBILE APP", "url": "https://gpsv26-mobile.streamlit.app/"},
     # Add your other 30 titles here...
 ]
 
 # 2. BOOKS (From your WildWarp/BubbleBum Screenshots)
 BOOKS = [
-    {"title": "The Bluetooth Paradox", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1614726365723-49cfae963c6d?q=80&w=400", "url": "AMAZON_LINK"},
-    {"title": "The Quantum Corral", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1533134486753-c833f0ed4866?q=80&w=400", "url": "AMAZON_LINK"},
-    {"title": "The Master Clock", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1495360019602-e001b27202ef?q=80&w=400", "url": "AMAZON_LINK"},
-    {"title": "BubbleBum Universe", "series": "Kids Collection", "img": "https://images.unsplash.com/photo-1519682337058-a5ca051231de?q=80&w=400", "url": "AMAZON_LINK"},
+    {"title": "The Bluetooth Paradox", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1614726365723-49cfae963c6d?q=80&w=400", "url": "https://a.co/d/cjmKEPo"},
+    {"title": "The Quantum Corral", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1533134486753-c833f0ed4866?q=80&w=400", "url": "https://a.co/d/9Q5H9f0"},
+    {"title": "The Master Clock", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1495360019602-e001b27202ef?q=80&w=400", "url": "https://a.co/d/2UShIjq"},
+    {"title": "BubbleBum Universe", "series": "Kids Collection", "img": "https://images.unsplash.com/photo-1519682337058-a5ca051231de?q=80&w=400", "url": "https://bubblebumbooks.com/"},
 ]
 
 # 3. MERCH LINKS
 MERCH_LINKS = {
-    "Mila Moo": "YOUR_REDBUBBLE_LINK",
-    "WildWarp": "YOUR_REDBUBBLE_LINK",
-    "Rhythm Logic": "YOUR_REDBUBBLE_LINK"
+    "Mila Moo": "https://www.redbubble.com/i/t-shirt/Mila-Moo-the-Cute-Chug-Puppy-3D-Clay-Style-Art-by-Bubblebum-Books/176609846.G2CME",
+    "WildWarp": "https://bubblebumbooks.com/wildwarp-chronicles",
+    "Bubblebum Books": "https://www.redbubble.com/shop/ap/176612771?asc=u"
 }
 
 # ==========================================
@@ -169,7 +168,7 @@ with tabs[2]:
         st.link_button("Shop Redbubble", MERCH_LINKS["Mila Moo"])
     with m2:
         st.info("**💀 WildWarp Gear**\nSci-Fi apparel & accessories.")
-        st.link_button("Shop Redbubble", MERCH_LINKS["WildWarp"])
+        st.link_button("Shop Amazon", MERCH_LINKS["WildWarp"])
     with m3:
         st.info("**🚀 Rhythm Logic Swag**\nOfficial brand merchandise.")
-        st.link_button("Shop Redbubble", MERCH_LINKS["Rhythm Logic"])
+        st.link_button("Shop Gum Road", MERCH_LINKS["Rhythm Logic"])
