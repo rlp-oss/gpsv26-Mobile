@@ -18,36 +18,86 @@ st.markdown("""
     h1, h2 { color: #d4af37; text-align: center; font-family: 'Helvetica', sans-serif; text-transform: uppercase; letter-spacing: 2px; }
     .step-text { text-align: center; font-size: 18px; margin-bottom: 20px; color: #ccc; }
     .stDeployButton {display:none;}
-    /* Highlight the Director's Chair */
     .director-box { border: 1px solid #444; padding: 20px; border-radius: 15px; background-color: #1e1e1e; margin-top: 20px;}
+    
+    /* Gumroad Paywall Styles */
+    .paywall-box { border: 2px solid #ff90e8; /* Gumroad Pink Accent */ padding: 30px; border-radius: 20px; text-align: center; background-color: #1a1a1a; margin-top: 50px; }
+    .price-tag { font-size: 40px; color: #d4af37; font-weight: bold; }
+    .per-month { font-size: 16px; color: #aaa; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SESSION STATE ---
+# --- 2. BUSINESS CONFIGURATION ---
+# 🔴 REPLACE THIS WITH YOUR GUMROAD PRODUCT LINK
+GUMROAD_LINK = "https://rhythmlogic.gumroad.com/l/dldqoy" 
+
+# 🔴 THIS IS THE MASTER PASSWORD YOU EMAIL TO SUBSCRIBERS
+ACCESS_CODE = "RHYTHM2026" 
+
+# --- 3. SESSION STATE ---
+if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if "step" not in st.session_state: st.session_state.step = 1
 if "project_type" not in st.session_state: st.session_state.project_type = "Book Chapter"
 if "work_style" not in st.session_state: st.session_state.work_style = "Teamwork"
 if "last_draft" not in st.session_state: st.session_state.last_draft = ""
-# We add a specific key for the refinement text so we can clear it manually
 if "refine_text_input" not in st.session_state: st.session_state.refine_text_input = ""
 
-# --- 3. SECURITY ---
+# --- 4. THE PAYWALL ---
+def show_paywall():
+    st.title("RHYTHM LOGIC GPS")
+    st.markdown("### The Professional's Ghostwriter")
+    
+    st.markdown(f"""
+    <div class='paywall-box'>
+        <h2>Pro Access Required</h2>
+        <p>Unlock the full AI studio for book chapters, lyrics, and more.</p>
+        <div class='price-tag'>$20<span class='per-month'>/mo</span></div>
+        <br>
+        <a href="{GUMROAD_LINK}" target="_blank">
+            <button style="background-color: #ff90e8; color: black; font-weight: bold; padding: 15px 32px; border: none; border-radius: 10px; cursor: pointer; width: 100%; font-size: 18px;">
+                👉 JOIN ON GUMROAD
+            </button>
+        </a>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.write("")
+    st.divider()
+    
+    st.write("Already a Member?")
+    code_input = st.text_input("Enter Access Code:", type="password")
+    
+    if st.button("Unlock Studio 🔓"):
+        if code_input == ACCESS_CODE:
+            st.session_state.authenticated = True
+            st.success("Access Granted.")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error("Invalid Code. Please check your Gumroad receipt or subscribe above.")
+
+if not st.session_state.authenticated:
+    show_paywall()
+    st.stop()
+
+# =========================================================
+# THE APP LOGIC
+# =========================================================
+
+# --- SECURITY ---
 api_key = None
 try:
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
 except:
     pass
-
 if not api_key:
     st.warning("🔒 Security Check")
     api_key = st.text_input("Enter Gemini API Key:", type="password")
     if not api_key: st.stop()
 
-# --- 4. THE AI ENGINE ---
-
+# --- AI ENGINE (Anti-Crash) ---
 def retry_generation(model, contents):
-    """Retries generation if we hit a speed limit."""
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -58,7 +108,7 @@ def retry_generation(model, contents):
             continue
         except Exception as e:
             return f"Error: {e}"
-    return "⚠️ Google is busy. Please wait a moment and try again."
+    return "⚠️ Google is busy. Wait a moment."
 
 def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
     genai.configure(api_key=key)
@@ -72,61 +122,34 @@ def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
     """
 
     if current_draft:
-        prompt = f"""
-        You are an expert Editor.
-        1. UPDATE the draft below based on the user's audio instructions.
-        2. Keep the goal of writing a {mode} in mind.
-        
-        CURRENT DRAFT:
-        {current_draft}
-        
-        {strategy_mandate}
-        """
-        content_payload = [prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
+        prompt = f"You are an expert Editor. UPDATE the draft below based on instructions.\nGoal: {mode}\nCURRENT DRAFT:\n{current_draft}\n{strategy_mandate}"
+        payload = [prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
     else:
-        # Initial Generation Logic (Same as before)
-        base_prompt = f"You are a Creative Partner. We are writing a {mode}. "
-        if style == "✨ Spark Me (Inspiration)":
-            base_prompt += "Transcribe the audio and propose 3 creative directions."
-        elif style == "🤝 Co-Pilot (Teamwork)":
-            base_prompt += "Transcribe the audio and write a polished Draft Version 1.0."
-        elif style == "🎓 Solo (Advice Only)":
-            base_prompt += "Transcribe exactly what was performed and provide a critique."
-            
-        final_prompt = f"{base_prompt}\n{strategy_mandate}"
-        content_payload = [final_prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
+        base = f"You are a Creative Partner. We are writing a {mode}. "
+        if style == "✨ Spark Me (Inspiration)": base += "Transcribe and propose 3 creative directions."
+        elif style == "🤝 Co-Pilot (Teamwork)": base += "Transcribe and write a polished Draft Version 1.0."
+        elif style == "🎓 Solo (Advice Only)": base += "Transcribe exactly and provide a critique."
+        payload = [f"{base}\n{strategy_mandate}", {"mime_type": "audio/mp3", "data": audio_file.read()}]
 
-    return retry_generation(model, content_payload)
+    return retry_generation(model, payload)
 
 def text_refinement(instruction, current_draft, key, is_audio=False):
-    """Handles both Text AND Audio instructions for refinement."""
     genai.configure(api_key=key)
     model = genai.GenerativeModel('gemini-2.0-flash')
+    base_prompt = f"Update the draft based on instruction.\nCRITICAL: Add '🔮 RHYTHM LOGIC STRATEGY' section.\nDRAFT:\n{current_draft}"
     
-    base_prompt = f"""
-    Update the draft below based on the user's instruction.
-    
-    CRITICAL: After updating the text, add a "🔮 RHYTHM LOGIC STRATEGY" section.
-    
-    DRAFT:
-    {current_draft}
-    """
-    
-    if is_audio:
-        # Instruction is an audio file
-        payload = [base_prompt, {"mime_type": "audio/mp3", "data": instruction.read()}]
-    else:
-        # Instruction is text
-        payload = f"{base_prompt}\n\nUSER INSTRUCTION: {instruction}"
+    if is_audio: payload = [base_prompt, {"mime_type": "audio/mp3", "data": instruction.read()}]
+    else: payload = f"{base_prompt}\nUSER INSTRUCTION: {instruction}"
     
     return retry_generation(model, payload)
 
-# --- 5. THE APP FLOW ---
-
-st.title("RHYTHM LOGIC GPS")
-
-# SIDEBAR RESET
+# --- APP FLOW ---
 with st.sidebar:
+    st.success("✅ **Pro Member Active**")
+    if st.button("Log Out"):
+        st.session_state.authenticated = False
+        st.rerun()
+    st.divider()
     st.write(f"**Project:** {st.session_state.project_type}")
     if st.button("🔄 Start New Project"):
         st.session_state.step = 1
@@ -134,8 +157,9 @@ with st.sidebar:
         st.session_state.refine_text_input = ""
         st.rerun()
 
-# STEP 1: PROJECT TYPE
+# STEP 1
 if st.session_state.step == 1:
+    st.title("RHYTHM LOGIC GPS")
     st.write("")
     st.markdown("## 1. What can I help you write today?")
     st.write("")
@@ -148,8 +172,9 @@ if st.session_state.step == 1:
             st.session_state.step = 2
             st.rerun()
 
-# STEP 2: WORKFLOW
+# STEP 2
 elif st.session_state.step == 2:
+    st.title("RHYTHM LOGIC GPS")
     st.markdown(f"## 2. Project: **{st.session_state.project_type}**")
     st.markdown("<p class='step-text'>Choose your Ghostwriter Mode:</p>", unsafe_allow_html=True)
     style = st.radio("Workflow:", ["✨ Spark Me (Inspiration)", "🤝 Co-Pilot (Teamwork)", "🎓 Solo (Advice Only)"])
@@ -159,13 +184,12 @@ elif st.session_state.step == 2:
         st.session_state.step = 3
         st.rerun()
 
-# STEP 3: STUDIO
+# STEP 3
 elif st.session_state.step == 3:
     st.markdown(f"### 🎙️ {st.session_state.project_type} Studio")
     st.caption(f"Mode: {st.session_state.work_style}")
     st.divider()
 
-    # INITIAL INPUTS
     if not st.session_state.last_draft:
         tab1, tab2 = st.tabs(["🔴 Record Initial Idea", "📂 Upload File"])
         audio_data = None
@@ -175,7 +199,6 @@ elif st.session_state.step == 3:
         with tab2:
             audio_up = st.file_uploader("Upload File", type=['mp3','wav','m4a'])
             if audio_up: audio_data = audio_up
-
         if audio_data:
             if st.button("⚡ Run Rhythm Logic"):
                 with st.spinner("Analyzing..."):
@@ -183,43 +206,27 @@ elif st.session_state.step == 3:
                     st.session_state.last_draft = result
                     st.rerun()
 
-    # RESULT & REFINEMENT
     if st.session_state.last_draft:
-        # EDITOR
         st.success("Analysis Complete")
         new_text = st.text_area("Workspace", st.session_state.last_draft, height=500)
         st.session_state.last_draft = new_text
         st.download_button("💾 Save Text", st.session_state.last_draft, "RL_Draft.txt")
         
-        # --- THE DIRECTOR'S CHAIR (UPGRADED) ---
         st.markdown("<div class='director-box'>", unsafe_allow_html=True)
         st.markdown("#### 🎬 Director's Chair")
         st.caption("Refine your draft using Voice OR Text.")
         
-        # 1. VOICE REFINEMENT
-        refine_audio = st.audio_input("🎤 Voice Command (e.g., 'Make the dialogue funnier')")
-        
+        refine_audio = st.audio_input("🎤 Voice Command")
         if refine_audio:
-            with st.spinner("Listening to your command..."):
+            with st.spinner("Listening..."):
                 updated = text_refinement(refine_audio, st.session_state.last_draft, api_key, is_audio=True)
                 st.session_state.last_draft = updated
                 st.rerun()
 
         st.write("--- OR ---")
 
-        # 2. TEXT REFINEMENT (LARGE BOX + AUTO CLEAR)
-        def clear_text():
-            """Callback to clear text after submission"""
-            st.session_state.refine_text_input = ""
-
-        # We use a form so the 'Clear' logic works smoothly
         with st.form(key='refine_form', clear_on_submit=True):
-            user_instruct = st.text_area(
-                "Text Instructions:", 
-                height=100, 
-                placeholder="Type instructions here... (e.g. 'Expand the second paragraph about the dragon')",
-                key="widget_refine_input" # Unique key for the widget
-            )
+            user_instruct = st.text_area("Text Instructions:", height=100, placeholder="Type instructions here...", key="widget_refine_input")
             submit_button = st.form_submit_button(label="Update Draft 🔄")
         
         if submit_button and user_instruct:
