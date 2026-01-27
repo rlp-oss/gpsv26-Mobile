@@ -5,3 +5,5 @@ google-auth-httplib2
 google-generativeai
 fpdf
 openai
+duckduckgo-search
+requests
