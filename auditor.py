@@ -46,10 +46,15 @@ with col1:
     st.subheader("📋 Your Empire Links")
     # I pre-filled this with your main apps based on your screenshots
     default_links = """https://rhythm-logic-live.streamlit.app/
+https://rhythm-logic-live.streamlit.app/
 https://www.google.com
 https://rhythmlogic.gumroad.com/l/dldqoy
 https://gpsv26-mobile-ze6vywftyjsfzpgf9ogrga.streamlit.app/
-https://www.redbubble.com/people/CodyGermain/shop
+https://rhythmlogicpublishing.com/
+https://bubblebumbooks.com/
+Bubblebum-Books.redbubble.com
+https://form.jotform.com/260105280536045
+https://rhythmlogic.gumroad.com/l/jrsdb
 """
     urls_input = st.text_area("Paste Links (One per line):", default_links, height=400)
 
