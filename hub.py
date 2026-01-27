@@ -85,9 +85,10 @@ BOOKS = [
 
 # 3. MERCH LINKS
 MERCH_LINKS = {
-    "Mila Moo": "https://www.redbubble.com/i/t-shirt/Mila-Moo-the-Cute-Chug-Puppy-3D-Clay-Style-Art-by-Bubblebum-Books/176609846.G2CME",
+    "Mila Moo": "https://www.redbubble.com/people/Bubblebum-Books/shop", 
     "WildWarp": "https://bubblebumbooks.com/wildwarp-chronicles",
-    "Bubblebum Books": "https://www.redbubble.com/shop/ap/176612771?asc=u"
+    "Rhythm Logic": "https://rhythmlogic.gumroad.com/"  # <--- Pointing to Gumroad now
+}
 }
 
 # ==========================================
@@ -171,4 +172,5 @@ with tabs[2]:
         st.link_button("Shop Amazon", MERCH_LINKS["WildWarp"])
     with m3:
         st.info("**🚀 Rhythm Logic Swag**\nOfficial brand merchandise.")
-        st.link_button("Shop Gum Road", MERCH_LINKS["Rhythm Logic"])
+        # This now correctly grabs the Gumroad link we defined above
+        st.link_button("Shop Gumroad", MERCH_LINKS["Rhythm Logic"])
