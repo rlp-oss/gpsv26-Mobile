@@ -187,6 +187,7 @@ st.markdown(f"""
     </div>
 </div>
 """, unsafe_allow_html=True)
+
 # --- FAQ ---
 st.markdown("### ❓ Frequently Asked Questions")
 
