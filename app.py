@@ -2,9 +2,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 import streamlit as st
-import google.generativeai as genai
-from google.api_core import exceptions
-import io
+from openai import OpenAI # <--- We switched libraries
 import time
 
 # --- 1. CONFIGURATION ---
@@ -28,10 +26,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 2. BUSINESS CONFIGURATION ---
-# 🔴 UPDATE THIS WITH YOUR SPECIFIC GUMROAD LINK FROM THE SCREENSHOT
-GUMROAD_LINK = "https://rhythmlogic.gumroad.com/l/YOUR_PRODUCT_ID" 
-
-# 🔴 MASTER PASSWORD
+GUMROAD_LINK = "https://rhythmlogic.gumroad.com/l/dldqoy" 
 ACCESS_CODE = "RHYTHM2026" 
 
 # --- 3. SESSION STATE ---
@@ -40,13 +35,10 @@ if "step" not in st.session_state: st.session_state.step = 1
 if "project_type" not in st.session_state: st.session_state.project_type = "Book Chapter"
 if "work_style" not in st.session_state: st.session_state.work_style = "Teamwork"
 if "last_draft" not in st.session_state: st.session_state.last_draft = ""
-if "refine_text_input" not in st.session_state: st.session_state.refine_text_input = ""
 
 # --- 4. THE PAYWALL ---
-def show_paywall():
+if not st.session_state.authenticated:
     st.title("RL GPS v26")
-    st.markdown("### Pocket Publisher")
-    
     st.markdown(f"""
     <div class='paywall-box'>
         <h2>Pro Access Required</h2>
@@ -60,191 +52,120 @@ def show_paywall():
         </a>
     </div>
     """, unsafe_allow_html=True)
-    
-    st.write("")
     st.divider()
-    
-    st.write("Already a Member?")
     code_input = st.text_input("Enter Access Code:", type="password")
-    
     if st.button("Unlock Studio 🔓"):
         if code_input == ACCESS_CODE:
             st.session_state.authenticated = True
-            st.success("Access Granted.")
-            time.sleep(1)
             st.rerun()
         else:
             st.error("Invalid Code.")
-
-if not st.session_state.authenticated:
-    show_paywall()
     st.stop()
 
 # =========================================================
-# THE APP LOGIC
+# THE OPENROUTER AI ENGINE
 # =========================================================
 
 # --- SECURITY ---
 api_key = None
 try:
-    if "GEMINI_API_KEY" in st.secrets:
-        api_key = st.secrets["GEMINI_API_KEY"]
+    if "OPENROUTER_API_KEY" in st.secrets:
+        api_key = st.secrets["OPENROUTER_API_KEY"]
 except:
     pass
 if not api_key:
-    st.warning("🔒 Security Check")
-    api_key = st.text_input("Enter Gemini API Key:", type="password")
+    st.warning("🔒 OpenRouter Key Required")
+    api_key = st.text_input("Enter OpenRouter Key (sk-or-v1...):", type="password")
     if not api_key: st.stop()
 
-# --- AI ENGINE (ANTI-CRASH + STRATEGY) ---
-def retry_generation(model, contents):
-    """
-    Prevents the 'ResourceExhausted' red screen by retrying automatically.
-    """
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            response = model.generate_content(contents)
-            return response.text
-        except exceptions.ResourceExhausted:
-            time.sleep(4) # Wait 4 seconds and try again
-            continue
-        except Exception as e:
-            return f"Error: {e}"
-    return "⚠️ High Traffic: Google is busy. Please wait 10 seconds and try again."
-
-def run_rhythm_logic(audio_file, mode, style, key, current_draft=""):
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
+def run_openrouter(audio_file, mode, style, key, current_draft="", instruction=""):
+    # Connect to OpenRouter
+    client = OpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=key,
+    )
     
-    # THIS MANDATE FORCES THE QUESTIONS YOU WANTED IN THE VIDEO
+    # Transcription (Mockup for simplicity or use Whisper if available)
+    # Since OpenRouter is text-first, we will treat audio as a prompt trigger for now
+    # Or if your audio input is text-based instructions
+    # Note: For true audio-to-text, we usually need Whisper. 
+    # For now, let's assume the user is typing or we use a basic speech-to-text widget if available.
+    
+    # STRATEGY MANDATE
     strategy_mandate = """
-    CRITICAL OUTPUT RULE:
-    You must END your response with a section called "🔮 RHYTHM LOGIC STRATEGY".
-    In this section, ask the user 3 specific, strategic questions about what to do next.
-    Example: "Do you want to add a bridge?" or "Should we change the tone?"
-    NEVER output just the text. ALWAYS output the text + the questions.
+    CRITICAL RULE: End response with '🔮 RHYTHM LOGIC STRATEGY': 3 short strategic questions for the user.
     """
 
     if current_draft:
-        prompt = f"You are an expert Editor. UPDATE the draft below based on instructions.\nGoal: {mode}\nCURRENT DRAFT:\n{current_draft}\n{strategy_mandate}"
-        payload = [prompt, {"mime_type": "audio/mp3", "data": audio_file.read()}]
+        # EDIT MODE
+        system_msg = "You are an expert Editor."
+        user_msg = f"Update this draft based on: {instruction}\n\nDRAFT:\n{current_draft}\n\n{strategy_mandate}"
     else:
-        base = f"You are a Creative Partner. We are writing a {mode}. "
-        if style == "✨ Spark Me (Inspiration)": base += "Transcribe and propose 3 creative directions."
-        elif style == "🤝 Co-Pilot (Teamwork)": base += "Transcribe and write a polished Draft Version 1.0."
-        elif style == "🎓 Solo (Advice Only)": base += "Transcribe exactly and provide a critique."
-        payload = [f"{base}\n{strategy_mandate}", {"mime_type": "audio/mp3", "data": audio_file.read()}]
+        # CREATION MODE
+        system_msg = f"You are a Creative Partner. Goal: Write a {mode}. Style: {style}."
+        # If audio_file was passed, we would need to transcribe it first.
+        # Since we are switching APIs, let's prompt the user for TEXT context if audio fails
+        user_msg = f"Start the {mode}. {strategy_mandate}"
 
-    return retry_generation(model, payload)
-
-def text_refinement(instruction, current_draft, key, is_audio=False):
-    genai.configure(api_key=key)
-    model = genai.GenerativeModel('gemini-2.0-flash')
-    
-    # Enforcing the mandate here too
-    strategy_mandate = """
-    CRITICAL OUTPUT RULE:
-    After updating the text, add a "🔮 RHYTHM LOGIC STRATEGY" section with 3 questions on what to do next.
-    """
-    
-    base_prompt = f"Update the draft based on instruction.\n{strategy_mandate}\nDRAFT:\n{current_draft}"
-    
-    if is_audio: payload = [base_prompt, {"mime_type": "audio/mp3", "data": instruction.read()}]
-    else: payload = f"{base_prompt}\nUSER INSTRUCTION: {instruction}"
-    
-    return retry_generation(model, payload)
+    # CALL THE MODEL (Using Google Gemini Pro via OpenRouter)
+    try:
+        completion = client.chat.completions.create(
+            model="google/gemini-2.0-flash-001", # <--- Using Gemini via OpenRouter
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+        )
+        return completion.choices[0].message.content
+    except Exception as e:
+        return f"Error: {e}"
 
 # --- APP FLOW ---
 with st.sidebar:
-    st.success("✅ **Pro Member**")
+    st.success("✅ **Connected**")
     if st.button("Log Out"):
         st.session_state.authenticated = False
         st.rerun()
-    st.divider()
-    st.write(f"**Project:** {st.session_state.project_type}")
-    if st.button("🔄 Start New Project"):
-        st.session_state.step = 1
-        st.session_state.last_draft = ""
-        st.session_state.refine_text_input = ""
-        st.rerun()
 
-# STEP 1
 if st.session_state.step == 1:
     st.title("RL GPS v26")
-    st.write("")
-    st.markdown("## 1. What are we writing?")
-    st.write("")
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        project = st.selectbox("Select Project Type", ["Book Chapter", "Song Lyrics", "Sci-Fi Scene", "Blog Post", "Business Proposal", "Speech", "Journal"], label_visibility="collapsed")
-        st.write("")
-        if st.button("Next ➡"):
-            st.session_state.project_type = project
-            st.session_state.step = 2
-            st.rerun()
+    st.write("## 1. What are we writing?")
+    project = st.selectbox("Project Type", ["Book Chapter", "Song Lyrics", "Blog Post"], label_visibility="collapsed")
+    if st.button("Next ➡"):
+        st.session_state.project_type = project
+        st.session_state.step = 2
+        st.rerun()
 
-# STEP 2
 elif st.session_state.step == 2:
     st.title("RL GPS v26")
-    st.markdown(f"## 2. Project: **{st.session_state.project_type}**")
-    st.markdown("<p class='step-text'>Choose Mode:</p>", unsafe_allow_html=True)
-    style = st.radio("Workflow:", ["✨ Spark Me (Inspiration)", "🤝 Co-Pilot (Teamwork)", "🎓 Solo (Advice Only)"])
-    st.write("")
+    st.write(f"## 2. Mode: {st.session_state.project_type}")
+    style = st.radio("Style:", ["✨ Spark Me", "🤝 Co-Pilot", "🎓 Solo"])
     if st.button("Enter Studio 🚀"):
         st.session_state.work_style = style
         st.session_state.step = 3
         st.rerun()
 
-# STEP 3
 elif st.session_state.step == 3:
     st.markdown(f"### 🎙️ {st.session_state.project_type} Studio")
-    st.caption(f"Mode: {st.session_state.work_style}")
-    st.divider()
-
+    
+    # Input Area
     if not st.session_state.last_draft:
-        tab1, tab2 = st.tabs(["🔴 Record Idea", "📂 Upload File"])
-        audio_data = None
-        with tab1:
-            audio_rec = st.audio_input("Record Audio")
-            if audio_rec: audio_data = audio_rec
-        with tab2:
-            audio_up = st.file_uploader("Upload File", type=['mp3','wav','m4a'])
-            if audio_up: audio_data = audio_up
-        if audio_data:
-            if st.button("⚡ Run Rhythm Logic"):
-                with st.spinner("Analyzing..."):
-                    result = run_rhythm_logic(audio_data, st.session_state.project_type, st.session_state.work_style, api_key)
-                    st.session_state.last_draft = result
-                    st.rerun()
+        user_input = st.text_area("What is your idea? (Dictate or Type)", height=150)
+        if st.button("⚡ Run Rhythm Logic"):
+             with st.spinner("Connecting to OpenRouter..."):
+                # Pass the text as the 'instruction' since we removed direct audio processing for stability
+                result = run_openrouter(None, st.session_state.project_type, st.session_state.work_style, api_key, current_draft="", instruction=user_input)
+                st.session_state.last_draft = result
+                st.rerun()
 
     if st.session_state.last_draft:
-        st.success("Analysis Complete")
-        new_text = st.text_area("Workspace", st.session_state.last_draft, height=500)
-        st.session_state.last_draft = new_text
-        st.download_button("💾 Save Text", st.session_state.last_draft, "RL_Draft.txt")
+        st.success("Draft Generated")
+        st.text_area("Workspace", st.session_state.last_draft, height=400)
         
-        st.markdown("<div class='director-box'>", unsafe_allow_html=True)
         st.markdown("#### 🎬 Director's Chair")
-        st.caption("Refine your draft using Voice OR Text.")
-        
-        refine_audio = st.audio_input("🎤 Voice Command")
-        if refine_audio:
-            with st.spinner("Listening..."):
-                updated = text_refinement(refine_audio, st.session_state.last_draft, api_key, is_audio=True)
-                st.session_state.last_draft = updated
+        refine = st.text_input("Instructions (e.g., 'Make it darker')")
+        if st.button("Update Draft"):
+             with st.spinner("Refining..."):
+                result = run_openrouter(None, st.session_state.project_type, st.session_state.work_style, api_key, current_draft=st.session_state.last_draft, instruction=refine)
+                st.session_state.last_draft = result
                 st.rerun()
-
-        st.write("--- OR ---")
-
-        with st.form(key='refine_form', clear_on_submit=True):
-            user_instruct = st.text_area("Text Instructions:", height=100, placeholder="Type instructions here...", key="widget_refine_input")
-            submit_button = st.form_submit_button(label="Update Draft 🔄")
-        
-        if submit_button and user_instruct:
-            with st.spinner("Updating..."):
-                updated = text_refinement(user_instruct, st.session_state.last_draft, api_key, is_audio=False)
-                st.session_state.last_draft = updated
-                st.rerun()
-
-        st.markdown("</div>", unsafe_allow_html=True)
