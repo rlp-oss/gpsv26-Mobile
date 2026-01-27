@@ -169,7 +169,7 @@ with c3:
     """, unsafe_allow_html=True)
 
 # --- THE OFFER STACK (The "No-Brainer") ---
-st.markdown("""
+st.markdown(f"""
 <div class='stack-container'>
     <h2 style='text-align: center; color: white; text-transform: uppercase;'>📦 What You Get Today</h2>
     <br>
@@ -187,10 +187,6 @@ st.markdown("""
     </div>
 </div>
 """, unsafe_allow_html=True)
-
-st.write("")
-st.divider()
-
 # --- FAQ ---
 st.markdown("### ❓ Frequently Asked Questions")
 
