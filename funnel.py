@@ -171,23 +171,20 @@ with c3:
 # --- THE OFFER STACK (The "No-Brainer") ---
 st.markdown(f"""
 <div class='stack-container'>
-    <h2 style='text-align: center; color: white; text-transform: uppercase;'>📦 What You Get Today</h2>
-    <br>
-    <div class='stack-item'>📱 <b>Rhythm Logic Mobile Studio</b> <span class='stack-value'>($20/mo Value)</span></div>
-    <div class='stack-item'>🤖 <b>The "Director's Chair" Engine</b> <span class='stack-value'>($15/mo Value)</span></div>
-    <div class='stack-item'>⚡ <b>Unlimited "Spark" Ideas</b> <span class='stack-value'>($10/mo Value)</span></div>
-    <div class='stack-item'>🔒 <b>Secure Cloud Storage</b> <span class='stack-value'>(Included)</span></div>
-    <div class='stack-item'>🎁 <b>BONUS: "Dictate Your Book" PDF Guide</b> <span class='stack-value'>($27 Value)</span></div>
-    
-    <div class='total-price'>Total Value: <span style='text-decoration: line-through; color: #888;'>$72/month</span></div>
-    <div class='real-price'>ONLY $20<span style='font-size: 20px; color: #aaa;'>/month</span></div>
-    
-    <div style='text-align: center;'>
-        <a href="{GUMROAD_LINK}" target="_blank" class="cta-button">👉 START CREATING NOW</a>
-    </div>
+<h2 style='text-align: center; color: white; text-transform: uppercase;'>📦 What You Get Today</h2>
+<br>
+<div class='stack-item'>📱 <b>Rhythm Logic Mobile Studio</b> <span class='stack-value'>($20/mo Value)</span></div>
+<div class='stack-item'>🤖 <b>The "Director's Chair" Engine</b> <span class='stack-value'>($15/mo Value)</span></div>
+<div class='stack-item'>⚡ <b>Unlimited "Spark" Ideas</b> <span class='stack-value'>($10/mo Value)</span></div>
+<div class='stack-item'>🔒 <b>Secure Cloud Storage</b> <span class='stack-value'>(Included)</span></div>
+<div class='stack-item'>🎁 <b>BONUS: "Dictate Your Book" PDF Guide</b> <span class='stack-value'>($27 Value)</span></div>
+<div class='total-price'>Total Value: <span style='text-decoration: line-through; color: #888;'>$72/month</span></div>
+<div class='real-price'>ONLY $20<span style='font-size: 20px; color: #aaa;'>/month</span></div>
+<div style='text-align: center;'>
+<a href="{GUMROAD_LINK}" target="_blank" class="cta-button">👉 START CREATING NOW</a>
+</div>
 </div>
 """, unsafe_allow_html=True)
-
 # --- FAQ ---
 st.markdown("### ❓ Frequently Asked Questions")
 
