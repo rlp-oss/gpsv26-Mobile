@@ -89,7 +89,6 @@ MERCH_LINKS = {
     "WildWarp": "https://bubblebumbooks.com/wildwarp-chronicles",
     "Rhythm Logic": "https://rhythmlogic.gumroad.com/"  # <--- Pointing to Gumroad now
 }
-}
 
 # ==========================================
 # 🖥️ THE FRONT END
