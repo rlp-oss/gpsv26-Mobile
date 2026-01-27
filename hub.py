@@ -72,15 +72,15 @@ SOFTWARE = [
     {"name": "Rhythm Logic Software", "desc": "The Official Rhythm Logic Sales Page.", "tag": "ENTERPRISE", "url": "https://rhythmlogic.gumroad.com/?_gl=1*1ydx5o7*_ga*MTA1MTI1MTMxNi4xNzY5NDcyMDQ4*_ga_6LJN6D94N6*czE3Njk1NDc4NzMkbzUkZzEkdDE3Njk1NDc4NzgkajU1JGwwJGgw"},
     {"name": "Rhythm Logic Publishing", "desc": "Fast Professional Full Stack Publishing Services", "tag": "ENTERPRISE", "url": "https://rhythmlogicpublishing.com/"},
     {"name": "Rhythm Logic Mobile", "desc": "The Pocket Publisher. Write books on the go.", "tag": "ENTERPRISE", "url": "https://gpsv26-mobile.streamlit.app/"},
-    # Add your other 30 titles here...
+    # 
 ]
 
 # 2. BOOKS (From your WildWarp/BubbleBum Screenshots)
 BOOKS = [
-    {"title": "The Bluetooth Paradox", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1614726365723-49cfae963c6d?q=80&w=400", "url": "https://a.co/d/cjmKEPo"},
-    {"title": "The Quantum Corral", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1533134486753-c833f0ed4866?q=80&w=400", "url": "https://a.co/d/9Q5H9f0"},
-    {"title": "The Master Clock", "series": "WildWarp Chronicles", "img": "https://images.unsplash.com/photo-1495360019602-e001b27202ef?q=80&w=400", "url": "https://a.co/d/2UShIjq"},
-    {"title": "BubbleBum Universe", "series": "Kids Collection", "img": "https://images.unsplash.com/photo-1519682337058-a5ca051231de?q=80&w=400", "url": "https://bubblebumbooks.com/"},
+    {"title": "The Bluetooth Paradox", "series": "WildWarp Chronicles", "img": "https://m.media-amazon.com/images/I/81xlyd9y2FL._SL1500_.jpg", "url": "https://a.co/d/cjmKEPo"},
+    {"title": "The Quantum Corral", "series": "WildWarp Chronicles", "img": "https://m.media-amazon.com/images/I/81ywZpXuU5L._SL1500_.jpg", "url": "https://a.co/d/9Q5H9f0"},
+    {"title": "The Master Clock", "series": "WildWarp Chronicles", "img": "https://m.media-amazon.com/images/I/81ZAGR4W3LL._SL1500_.jpg", "url": "https://a.co/d/2UShIjq"},
+    {"title": "BubbleBum Universe", "series": "Kids Collection", "img": "https://ih0.redbubble.net/avatar.10585962.140x140.jpg", "url": "https://bubblebumbooks.com/"},
 ]
 
 # 3. MERCH LINKS
