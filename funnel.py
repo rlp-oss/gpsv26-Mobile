@@ -86,23 +86,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- HERO SECTION ---
+# --- HERO SECTION (UPDATED) ---
 st.markdown(f"""
 <div class='hero-container'>
     <div class='main-headline'>STOP LOSING YOUR BEST IDEAS.</div>
     <div class='sub-headline'>The AI "Pocket Publisher" that turns your messy voice notes into polished books, lyrics, and content—instantly.</div>
-    
-    <div class='video-box'>
-        <img src="https://images.unsplash.com/photo-1555421689-d68471e189f2?q=80&w=2070&auto=format&fit=crop" style="width: 100%; border-radius: 10px; opacity: 0.6;">
-        <p style="color: #888; margin-top: 10px;">(Your 60-Second Demo Video Goes Here)</p>
-    </div>
+</div>
+""", unsafe_allow_html=True)
 
+# --- THE VIDEO PLAYER ---
+# 1. Upload your video to YouTube (set as "Unlisted") and paste the link here.
+# OR
+# 2. Upload a file named 'demo.mp4' to your GitHub repo and change this to "demo.mp4"
+col1, col2, col3 = st.columns([1, 4, 1]) # Centers the video
+with col2:
+    st.markdown("<div class='video-box'>", unsafe_allow_html=True)
+    # REPLACE THIS LINK WITH YOUR OWN VIDEO
+    st.video("https://www.youtube.com/watch?v=dQw4w9WgXcQ") 
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# --- THE CALL TO ACTION BUTTON ---
+st.markdown(f"""
+<div class='hero-container'>
     <a href="{GUMROAD_LINK}" target="_blank" class="cta-button">👉 GET INSTANT ACCESS</a>
     <p style="color: #666; font-size: 14px;">Instant Activation • Cancel Anytime</p>
 </div>
 """, unsafe_allow_html=True)
-
-st.divider()
 
 # --- THE PROBLEM / AGITATION ---
 col1, col2 = st.columns([1, 1])
