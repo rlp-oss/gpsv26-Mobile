@@ -31,7 +31,7 @@ else:
 
 # --- UI LAYOUT ---
 st.title("🌍 The Pocket School")
-st.markdown("**Universal Education Engine**")
+st.markdown("**Powered by Rhythm Logic AI (Gemini 2.0)**")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -45,8 +45,7 @@ topic_drill = st.text_input("Specific Topic:", placeholder="e.g. Fractions")
 # --- THE ENGINE ---
 def generate_lesson_google(age, subj, loc, topic):
     
-    # 1. THE BRAIN (Your Gem Instructions)
-    # We paste the text here so the App knows how to behave.
+    # 1. THE BRAIN (Your Universal Education Engine Instructions)
     system_instruction = """
     Role: You are the "Universal Education Engine," a highly adaptive, localized teacher.
     Directive: Adapt every lesson to the user's specific Location (City/Country). Use local names, currency, and culture.
@@ -68,7 +67,10 @@ def generate_lesson_google(age, subj, loc, topic):
     # 3. GENERATE
     full_prompt = f"{system_instruction}\n\nTASK: {user_request}"
     
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # *** UPDATED MODEL SELECTION ***
+    # Using 'gemini-2.0-flash' from your verified list.
+    model = genai.GenerativeModel('gemini-2.0-flash')
+    
     response = model.generate_content(full_prompt)
     return response.text
 
