@@ -94,7 +94,7 @@ def generate_lesson_google(age, subj, loc, topic):
     full_prompt = f"{system_instruction}\n\nTASK: {user_request}"
     
     # Using the Lite model that works for you
-    model = genai.GenerativeModel('gemini-2.0-flash-lite-001')
+    model = genai.GenerativeModel('gemini-flash-latest')
     
     response = model.generate_content(full_prompt)
     return response.text
