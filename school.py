@@ -1,7 +1,5 @@
 import streamlit as st
-from openai import OpenAI
-import google.generativeai as genai # <--- REQUIRED: Install 'google-generativeai'
-import time
+import google.generativeai as genai
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="The Pocket School", page_icon="🌍", layout="centered")
@@ -19,46 +17,21 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         margin-top: 20px;
     }
-    .status-badge {
-        font-size: 12px;
-        background-color: #e8f5e9;
-        color: #2e7d32;
-        padding: 4px 8px;
-        border-radius: 4px;
-        border: 1px solid #c8e6c9;
-        margin-bottom: 10px;
-        display: inline-block;
-    }
     .stButton button { width: 100%; background-color: #2e7d32; color: white; font-weight: bold; padding: 12px; }
     .stButton button:hover { background-color: #1b5e20; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SETUP CREDENTIALS ---
-# 1. OpenRouter (Primary Layer)
-if "OPENROUTER_API_KEY" in st.secrets:
-    openrouter_key = st.secrets["OPENROUTER_API_KEY"]
-else:
-    st.error("🔑 Critical Error: OPENROUTER_API_KEY missing from secrets.")
-    st.stop()
-
-# 2. Google Gemini (Backup Layer - Direct)
-gemini_backup_ready = False
+# --- CREDENTIALS ---
 if "GEMINI_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-    gemini_backup_ready = True
-
-# --- THE MODEL LIST (OpenRouter IDs) ---
-# Removed the broken Llama :free tag and prioritized stable Google models
-MODEL_CASCADE = [
-    "google/gemini-2.0-flash-lite-preview-02-05:free", # Fast & New
-    "google/gemini-flash-1.5-8b",                      # Very Cheap/Fast
-    "mistralai/mistral-7b-instruct:free",              # Reliable Free Alternative
-]
+else:
+    st.error("🔑 Critical Error: GEMINI_API_KEY missing from secrets.")
+    st.stop()
 
 # --- UI LAYOUT ---
 st.title("🌍 The Pocket School")
-st.markdown("**Universal Education Engine.**")
+st.markdown("**Universal Education Engine**")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -66,82 +39,47 @@ with col1:
 with col2:
     subject = st.selectbox("Subject", ["Mathematics", "Science", "English/Reading", "Social Studies", "Business"])
 
-region = st.text_input("📍 Region:", "Lagos, Nigeria", help="Enter city/country. The AI adapts the lesson to this location.")
-topic_drill = st.text_input("Specific Topic (Optional):", placeholder="e.g. Fractions, Photosynthesis")
+region = st.text_input("📍 Region:", "Lagos, Nigeria")
+topic_drill = st.text_input("Specific Topic:", placeholder="e.g. Fractions")
 
-# --- ROBUST GENERATION FUNCTION ---
-def generate_lesson_cascade(key, age, subj, loc, topic):
-    client = OpenAI(
-        base_url="https://openrouter.ai/api/v1",
-        api_key=key,
-    )
-
-    prompt = f"""
-    Act as an expert teacher in {loc}. Create a lesson plan for age {age} on {subj}.
-    TOPIC: {topic if topic else "Fundamental Concept"}
+# --- THE ENGINE ---
+def generate_lesson_google(age, subj, loc, topic):
     
-    RULES:
-    1. Use local names, currency, food, and places from {loc}.
-    2. NO supplies needed. Text only.
-    3. Structure: 
-       - **Topic**
-       - **Concept (2 mins)**
-       - **Real Life Example (in {loc})**
-       - **Activity (No supplies)**
-       - **Quiz (3 Questions)**
+    # 1. THE BRAIN (Your Gem Instructions)
+    # We paste the text here so the App knows how to behave.
+    system_instruction = """
+    Role: You are the "Universal Education Engine," a highly adaptive, localized teacher.
+    Directive: Adapt every lesson to the user's specific Location (City/Country). Use local names, currency, and culture.
+    Constraints: 
+    1. Zero-Cost: No supplies allowed. 
+    2. Format: Text-only, structured.
+    
+    Structure:
+    - The Hook (Connect to daily life in the city)
+    - The Concept (Simple explanation)
+    - Real-World Example (Use a local example)
+    - The Activity (No supplies needed)
+    - The Quiz (3 Questions)
     """
 
-    last_error = None
+    # 2. THE USER REQUEST
+    user_request = f"Create a lesson for age {age} on {subj} about {topic} in {loc}."
+
+    # 3. GENERATE
+    full_prompt = f"{system_instruction}\n\nTASK: {user_request}"
     
-    # --- LAYER 1: OpenRouter Cascade ---
-    for model_name in MODEL_CASCADE:
-        try:
-            status_placeholder.markdown(f"<span class='status-badge'>📡 Calling Teacher: {model_name}...</span>", unsafe_allow_html=True)
-            
-            completion = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": "You are a helpful local teacher."},
-                    {"role": "user", "content": prompt}
-                ],
-                extra_headers={
-                    "HTTP-Referer": "https://rhythm-logic.com", 
-                    "X-Title": "The Pocket School",
-                },
-            )
-            return completion.choices[0].message.content, model_name
-            
-        except Exception as e:
-            print(f"⚠️ {model_name} failed: {e}")
-            last_error = e
-            continue 
-            
-    # --- LAYER 2: Direct Google Backup (The Safety Net) ---
-    if gemini_backup_ready:
-        try:
-            status_placeholder.markdown(f"<span class='status-badge'>🛡️ OpenRouter Busy. Switching to Direct Satellite (Gemini)...</span>", unsafe_allow_html=True)
-            model = genai.GenerativeModel('gemini-1.5-flash')
-            response = model.generate_content(prompt)
-            return response.text, "Google Gemini (Direct Backup)"
-        except Exception as google_e:
-            print(f"Google Backup failed: {google_e}")
-            
-    # If EVERYTHING fails
-    raise last_error
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content(full_prompt)
+    return response.text
 
 # --- MAIN ACTION ---
-status_placeholder = st.empty()
-
-if st.button("🎓 Generate Lesson"):
+if st.button("🎓 Start Class"):
     try:
-        with st.spinner("Preparing class materials..."):
-            lesson_content, successful_model = generate_lesson_cascade(openrouter_key, student_age, subject, region, topic_drill)
+        with st.spinner("Teacher is preparing..."):
+            lesson_content = generate_lesson_google(student_age, subject, region, topic_drill)
         
-        # Success
-        status_placeholder.empty()
-        st.success(f"Class is in session! (Teacher: {successful_model})")
+        st.success("Class is in session!")
         st.markdown(f"<div class='lesson-box'>{lesson_content}</div>", unsafe_allow_html=True)
         
     except Exception as e:
-        status_placeholder.empty()
-        st.error(f"School is temporarily closed. All satellites busy. ({e})")
+        st.error(f"Error: {e}")
