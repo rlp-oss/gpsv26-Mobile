@@ -1,5 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
+from fpdf import FPDF
+import base64
 
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="The Pocket School", page_icon="🌍", layout="centered")
@@ -29,9 +31,37 @@ else:
     st.error("🔑 Critical Error: GEMINI_API_KEY missing from secrets.")
     st.stop()
 
+# --- PDF GENERATOR FUNCTION ---
+def create_pdf(lesson_text, subject, age, location):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    
+    # Title
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(200, 10, txt="The Pocket School | Lesson Plan", ln=True, align='C')
+    
+    # Metadata
+    pdf.set_font("Arial", "I", 12)
+    pdf.cell(200, 10, txt=f"Subject: {subject} | Age: {age} | Location: {location}", ln=True, align='C')
+    pdf.ln(10)
+    
+    # Body Content
+    pdf.set_font("Arial", size=12)
+    
+    # Clean up text (FPDF doesn't like markdown asterisks or emojis)
+    clean_text = lesson_text.replace("**", "").replace("#", "")
+    
+    # Handle encoding (replace emojis with ? to prevent crashing)
+    clean_text = clean_text.encode('latin-1', 'replace').decode('latin-1')
+    
+    pdf.multi_cell(0, 10, clean_text)
+    
+    return pdf.output(dest='S').encode('latin-1')
+
 # --- UI LAYOUT ---
 st.title("🌍 The Pocket School")
-st.markdown("**Powered by Rhythm Logic AI **")
+st.markdown("**Powered by Rhythm Logic AI**")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -45,7 +75,6 @@ topic_drill = st.text_input("Specific Topic:", placeholder="e.g. Fractions")
 # --- THE ENGINE ---
 def generate_lesson_google(age, subj, loc, topic):
     
-    # 1. THE BRAIN (Your Universal Education Engine Instructions)
     system_instruction = """
     Role: You are the "Universal Education Engine," a highly adaptive, localized teacher.
     Directive: Adapt every lesson to the user's specific Location (City/Country). Use local names, currency, and culture.
@@ -58,30 +87,43 @@ def generate_lesson_google(age, subj, loc, topic):
     - The Concept (Simple explanation)
     - Real-World Example (Use a local example)
     - The Activity (No supplies needed)
-    - The Quiz (3 Questions)
+    - The Quiz (10 Questions)
     """
 
-    # 2. THE USER REQUEST
     user_request = f"Create a lesson for age {age} on {subj} about {topic} in {loc}."
-
-    # 3. GENERATE
     full_prompt = f"{system_instruction}\n\nTASK: {user_request}"
     
-    # *** UPDATED MODEL SELECTION ***
-    # Using 'gemini-2.0-flash-lite-001' from your verified list.
-    model = genai.GenerativeModel('gemini-flash-latest')
+    # Using the Lite model that works for you
+    model = genai.GenerativeModel('gemini-2.0-flash-lite-001')
     
     response = model.generate_content(full_prompt)
     return response.text
 
 # --- MAIN ACTION ---
+if "lesson_content" not in st.session_state:
+    st.session_state.lesson_content = ""
+
 if st.button("🎓 Start Class"):
     try:
         with st.spinner("Teacher is preparing..."):
-            lesson_content = generate_lesson_google(student_age, subject, region, topic_drill)
-        
-        st.success("Class is in session!")
-        st.markdown(f"<div class='lesson-box'>{lesson_content}</div>", unsafe_allow_html=True)
-        
+            # Generate and store in session state so it doesn't disappear when we click download
+            st.session_state.lesson_content = generate_lesson_google(student_age, subject, region, topic_drill)
+            st.session_state.generated = True
+            
     except Exception as e:
         st.error(f"Error: {e}")
+
+# Display Result if it exists
+if st.session_state.lesson_content:
+    st.success("Class is in session!")
+    st.markdown(f"<div class='lesson-box'>{st.session_state.lesson_content}</div>", unsafe_allow_html=True)
+    
+    # --- DOWNLOAD BUTTON ---
+    pdf_bytes = create_pdf(st.session_state.lesson_content, subject, student_age, region)
+    
+    st.download_button(
+        label="📥 Download Lesson Plan (PDF)",
+        data=pdf_bytes,
+        file_name="pocket_school_lesson.pdf",
+        mime="application/pdf"
+    )
