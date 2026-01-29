@@ -31,7 +31,7 @@ else:
 
 # --- UI LAYOUT ---
 st.title("🌍 The Pocket School")
-st.markdown("**Powered by Rhythm Logic AI (Gemini 2.0)**")
+st.markdown("**Powered by Rhythm Logic AI **")
 
 col1, col2 = st.columns(2)
 with col1:
@@ -68,8 +68,8 @@ def generate_lesson_google(age, subj, loc, topic):
     full_prompt = f"{system_instruction}\n\nTASK: {user_request}"
     
     # *** UPDATED MODEL SELECTION ***
-    # Using 'gemini-2.0-flash' from your verified list.
-    model = genai.GenerativeModel('gemini-2.0-flash')
+    # Using 'gemini-1.5-flash' from your verified list.
+    model = genai.GenerativeModel('gemini-1.5-flash')
     
     response = model.generate_content(full_prompt)
     return response.text
